@@ -112,9 +112,9 @@ describe('PresentedResource', () => {
   });
 
   /**
-   * What presenting a Space Resource should draw is `resource-content/07`'s
-   * open question; until it is settled a presented Space Resource draws its
-   * name and nothing below it, rather than an empty document.
+   * A Space Resource's Map needs the Space it points at, which only the
+   * application can hold, so the application hands the drawing in and it
+   * takes the place of the content's own view (ADR 0123).
    */
   it('draws what the application hands it in place of the content’s own view', () => {
     const { container } = render(

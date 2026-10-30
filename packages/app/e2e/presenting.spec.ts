@@ -330,6 +330,12 @@ test(
     for (const _ of [0, 1, 2]) await page.keyboard.press('ArrowRight');
     await expect(presentedName(page)).toHaveText('D');
     await expect(presentedResource(page).locator('hr')).toHaveCount(1);
+    // A list keeps its markers on the Stage: the reset that strips them is
+    // undone for presented content.
+    await expect(presentedResource(page).locator('ul').first()).toHaveCSS(
+      'list-style-type',
+      'disc',
+    );
 
     const body = stageBody(page);
     const scrollTop = () => body.evaluate((element) => element.scrollTop);

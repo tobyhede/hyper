@@ -6,6 +6,7 @@ import {
   referenceKind,
   spaceKind,
   urKind,
+  UNRESOLVED_CONTENT,
   type KindId,
   type ResourceContent,
 } from '@project/core';
@@ -99,11 +100,31 @@ export function useKindDecoratedNodes(
   return decorate(nodes, context);
 }
 
+/** Each kind's content, as the Stage hands it to that kind's presentation. */
+type ContentByKind = { [K in KindId]: Extract<ResourceContent, { readonly kind: K }> };
+
 /**
- * What the Stage draws in place of a content's own view, for the one kind
- * whose presented content needs the application: a Space Resource's Map.
- * Every other kind's presented content is its view half's, so this answers
- * `undefined` for it.
+ * What the Stage draws in place of a content's own view, for a kind whose
+ * presented content needs the application: a Space Resource's Map, which needs
+ * the Space it points at. `null` for a kind whose presented content is its view
+ * half's alone.
+ */
+const PRESENTATIONS: {
+  readonly [K in KindId]: ((content: ContentByKind[K]) => ReactNode) | null;
+} = {
+  [markdownKind.id]: null,
+  [imageKind.id]: null,
+  [urKind.id]: null,
+  [referenceKind.id]: null,
+  [spaceKind.id]: spacePresentation,
+};
+
+const presentationOf = <K extends KindId>(kind: K, content: ContentByKind[K]): ReactNode =>
+  PRESENTATIONS[kind]?.(content);
+
+/**
+ * What the Stage draws in place of a content's own view, as its kind's app
+ * half draws it, or `undefined` for a kind whose view half draws it alone.
  */
 export const presentedByApplication = (content: ResourceContent): ReactNode =>
-  content.kind === spaceKind.id ? spacePresentation(content) : undefined;
+  content.kind === UNRESOLVED_CONTENT.kind ? undefined : presentationOf(content.kind, content);

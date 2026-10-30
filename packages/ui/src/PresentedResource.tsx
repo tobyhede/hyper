@@ -47,8 +47,8 @@ export function PresentedResource({ title, content, children }: PresentedResourc
 /**
  * The content below a presented Resource's name, drawn by its kind's view half
  * (`kinds/registry.ts`). A presented image is never replaced, its own or a
- * Target's, so no view offers Replace. A Space Resource draws its name alone:
- * what presenting one should draw is `resource-content/07`'s open question. An
+ * Target's, so no view offers Replace. A Space Resource's view half draws
+ * nothing here: the application draws its Map instead, through `children`. An
  * Ur Resource has no content (ADR 0113), so it draws its name alone. The
  * article carries the kind as `data-content-kind` so a stylesheet can address
  * each kind's frame.

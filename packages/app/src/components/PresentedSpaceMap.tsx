@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ReactFlow, ReactFlowProvider, useReactFlow } from '@xyflow/react';
 import type { GraphId, MapId, UUID } from '@project/core';
 import { edgeTypes, GraphHeadMarkers, nodeTypes } from '@project/react-flow-adapter';
+import { Empty, EmptyHeader, EmptyTitle } from '@project/ui';
 import { createMapSurface } from '../map-surface';
 import { withSurfacePolicy } from '../map-surface-policy';
 import type { OpenSpace } from '../open-spaces';
@@ -20,7 +21,8 @@ const STAGE_FIT = { padding: 0.08, maxZoom: 4 } as const;
  * The target Space is held while it is drawn, exactly as a Space Resource's
  * embedding on the canvas holds it (ADR 0112), and drawn by the same surface
  * under the inert policy: nothing on it takes a pointer or a key, and it
- * authors nothing.
+ * authors nothing. A Space that cannot be held, or that has no such Map, says
+ * so on the slide rather than leaving it blank.
  */
 export function PresentedSpaceMap({
   spaceId,
@@ -33,6 +35,7 @@ export function PresentedSpaceMap({
 }) {
   const spaces = useOpenSpaces();
   const [entry, setEntry] = useState<OpenSpace | null>(null);
+  const [unheld, setUnheld] = useState(false);
   useEffect(() => {
     if (spaces === null) return undefined;
     let release: (() => Promise<void>) | undefined;
@@ -46,20 +49,38 @@ export function PresentedSpaceMap({
         release = hold.release;
         setEntry(hold.entry);
       },
-      () => undefined,
+      () => {
+        if (!left) setUnheld(true);
+      },
     );
     return () => {
       left = true;
       setEntry(null);
+      setUnheld(false);
       void release?.();
     };
   }, [spaces, spaceId]);
-  if (entry?.app.currentSpace().lookup.map(mapId) === undefined) {
+  const drawn = entry?.app.currentSpace().lookup.map(mapId);
+  if (unheld || (entry !== null && drawn === undefined)) {
+    return (
+      <Empty className="presented-map" data-testid="presented-map-missing">
+        <EmptyHeader>
+          <EmptyTitle>Map not available</EmptyTitle>
+        </EmptyHeader>
+      </Empty>
+    );
+  }
+  if (entry === null || drawn === undefined) {
     return <div className="presented-map" data-testid="presented-map" aria-busy="true" />;
   }
   return (
     <ReactFlowProvider>
-      <PresentedMapDrawing entry={entry} mapId={mapId} graphId={graphId} />
+      <PresentedMapDrawing
+        entry={entry}
+        mapId={mapId}
+        graphId={graphId}
+        mapTitle={drawn.map.title}
+      />
     </ReactFlowProvider>
   );
 }
@@ -68,10 +89,12 @@ function PresentedMapDrawing({
   entry,
   mapId,
   graphId,
+  mapTitle,
 }: {
   readonly entry: OpenSpace;
   readonly mapId: MapId;
   readonly graphId: GraphId;
+  readonly mapTitle: string;
 }) {
   const [surface] = useState(() =>
     createMapSurface(entry.app, () => ({
@@ -116,11 +139,21 @@ function PresentedMapDrawing({
     observer.observe(element);
     return () => observer.disconnect();
   }, [fitView]);
+  // Fitted again whenever the drawing changes, so a Resource moved or resized
+  // in the held Space while it is presented stays inside the frame.
   useEffect(() => {
     if (nodes.length > 0) void fitView(STAGE_FIT);
-  }, [nodes.length, fitView]);
+  }, [nodes, fitView]);
   return (
-    <div ref={frame} className="presented-map" data-testid="presented-map" aria-hidden="true">
+    // One image to assistive technology, named by its Map: the nodes inside
+    // are drawn for the audience and take no focus.
+    <div
+      ref={frame}
+      className="presented-map"
+      data-testid="presented-map"
+      role="img"
+      aria-label={`Map ${mapTitle}`}
+    >
       <ReactFlow
         className="presented-map__flow"
         nodes={nodes}
