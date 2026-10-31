@@ -2,7 +2,7 @@ import type { ResourceId } from '@project/core';
 import type { CommandOutcomes } from './command-outcomes';
 import type { SurfaceAuthoring } from './space-authoring';
 import { keyBelongsElsewhere, OWNS_ITS_KEYS, type CommandId } from './key-bindings';
-import type { KeyAnswer } from './key-dispatcher';
+import { declined, RAN, type KeyAnswer, type KeyOutcome } from './key-dispatcher';
 
 /**
  * Whether a command can run for a target, and if not, whether it is offered at all.
@@ -105,21 +105,41 @@ const guardedFor = (command: CanvasCommand<never>, event: KeyboardEvent): boolea
   return !(event.target instanceof Element) || event.target.closest(NOT_A_CANVAS_COMMAND) !== null;
 };
 
+/** Why a key left a press to the element it landed on. */
+export const KEPT_BY_TARGET = declined('The element it landed on keeps its keys.');
+
+/** Why a command that cannot run for its target left the press alone, if it cannot. */
+export const notRunnable = (availability: CommandAvailability): KeyOutcome | undefined => {
+  if (availability.kind === 'unavailable') return declined(availability.reason);
+  if (availability.kind === 'absent') return declined('It is not offered here.');
+  return undefined;
+};
+
+/** Why a command whose aim found nothing left the press alone. */
+const NO_TARGET = {
+  'focused-resource': 'No Resource has focus.',
+  selection: 'Nothing is selected.',
+  canvas: 'There is no Map to act on.',
+} as const satisfies Record<CanvasCommandAim, string>;
+
 /**
  * Answer a press of `command`'s key: past its aim's guard, at the target
  * `targetOf` finds for the press, and only while the command is available
- * there. Says whether it ran, which is whether the press was taken.
+ * there. Says whether it ran, which is whether the press was taken, and if
+ * not, why.
  */
 export function answerCommand<Target>(
   command: CanvasCommand<Target>,
   event: KeyboardEvent,
   targetOf: () => Target | undefined,
-): boolean {
-  if (guardedFor(command, event)) return false;
+): KeyOutcome {
+  if (guardedFor(command, event)) return KEPT_BY_TARGET;
   const target = targetOf();
-  if (target === undefined || command.availability(target).kind !== 'available') return false;
+  if (target === undefined) return declined(NO_TARGET[command.aim]);
+  const refused = notRunnable(command.availability(target));
+  if (refused !== undefined) return refused;
   command.run(target);
-  return true;
+  return RAN;
 }
 
 /** The key answer for `command`, at the target `targetOf` finds for each press. */

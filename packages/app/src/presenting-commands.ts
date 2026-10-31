@@ -1,6 +1,12 @@
 import { keyBelongsElsewhere, type CommandId } from './key-bindings';
-import type { KeyAnswer } from './key-dispatcher';
-import { ABSENT, AVAILABLE, type CommandAvailability } from './canvas-commands';
+import { RAN, type KeyAnswer } from './key-dispatcher';
+import {
+  ABSENT,
+  AVAILABLE,
+  KEPT_BY_TARGET,
+  notRunnable,
+  type CommandAvailability,
+} from './canvas-commands';
 
 /** The Traversal operations the Presenting commands perform, all Navigation's own. */
 export interface TraversalCommands {
@@ -107,9 +113,10 @@ export function presentingCommands(traversal: TraversalCommands): readonly Prese
 export const presentingKeyAnswer = (command: PresentingCommand): KeyAnswer => ({
   id: command.id,
   answer: (event) => {
-    if (keyBelongsElsewhere(event) || command.availability(event).kind !== 'available')
-      return false;
+    if (keyBelongsElsewhere(event)) return KEPT_BY_TARGET;
+    const refused = notRunnable(command.availability(event));
+    if (refused !== undefined) return refused;
     command.run();
-    return true;
+    return RAN;
   },
 });

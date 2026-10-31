@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createKeyDispatcher, type AnswersIn, type CoveringContext } from '../src/key-dispatcher';
+import {
+  createKeyDispatcher,
+  declined as declinedFor,
+  RAN,
+  type AnswersIn,
+  type CoveringContext,
+  type DispatchReport,
+} from '../src/key-dispatcher';
 
 const press = (key: string): KeyboardEvent =>
   new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
@@ -9,7 +16,7 @@ describe('the key dispatcher', () => {
     const target = new EventTarget();
     const dispatcher = createKeyDispatcher(target);
     let takes = false;
-    const answer = vi.fn(() => takes);
+    const answer = vi.fn(() => (takes ? RAN : declinedFor('Not yet.')));
     dispatcher.register(() => [{ id: 'canvas.presentFromHere', answer }], 'canvas');
 
     const declined = press('p');
@@ -27,8 +34,8 @@ describe('the key dispatcher', () => {
   it('offers a press to the registrations in order and stops at the first that takes it', () => {
     const target = new EventTarget();
     const dispatcher = createKeyDispatcher(target);
-    const first = vi.fn(() => true);
-    const second = vi.fn(() => true);
+    const first = vi.fn(() => RAN);
+    const second = vi.fn(() => RAN);
     dispatcher.register(() => [{ id: 'canvas.presentFromHere', answer: first }], 'canvas');
     dispatcher.register(() => [{ id: 'canvas.presentFromHere', answer: second }], 'canvas');
 
@@ -47,7 +54,7 @@ describe('the key dispatcher', () => {
     const unregisterBubble = dispatcher.register(() => [], 'canvas');
     const unregisterAgain = dispatcher.register(() => [], 'canvas');
     const unregisterCapture = dispatcher.register(
-      () => [{ id: 'help.showShortcuts', answer: () => true }],
+      () => [{ id: 'help.showShortcuts', answer: () => RAN }],
       'on-screen',
       'capture',
     );
@@ -81,7 +88,7 @@ describe('the key dispatcher', () => {
             id: 'help.showShortcuts',
             answer: () => {
               answered.push(answersIn);
-              return false;
+              return declinedFor('Listening only.');
             },
           },
         ],
@@ -97,7 +104,7 @@ describe('the key dispatcher', () => {
   it('takes the most covering context, and returns to the canvas when the last cover lifts', () => {
     const target = new EventTarget();
     const dispatcher = createKeyDispatcher(target);
-    const answer = vi.fn(() => true);
+    const answer = vi.fn(() => RAN);
     dispatcher.register(() => [{ id: 'canvas.addResource', answer }], 'canvas');
 
     const uncoverFullView = dispatcher.cover('full-view');
@@ -113,5 +120,41 @@ describe('the key dispatcher', () => {
     uncoverFullView();
     target.dispatchEvent(press('c'));
     expect(answer).toHaveBeenCalledOnce();
+  });
+
+  it('tells its trace each command a press matched, what came of it, and where the Space was', () => {
+    const target = new EventTarget();
+    const reports: DispatchReport[] = [];
+    const dispatcher = createKeyDispatcher(target, (_event, report) => reports.push(report));
+    dispatcher.register(
+      () => [
+        { id: 'canvas.presentFromHere', answer: () => declinedFor('Nothing is selected.') },
+        { id: 'canvas.addResource', answer: () => RAN },
+      ],
+      'canvas',
+    );
+
+    target.dispatchEvent(press('p'));
+    target.dispatchEvent(press('c'));
+    target.dispatchEvent(press('q'));
+    dispatcher.cover('off-screen');
+    target.dispatchEvent(press('c'));
+
+    expect(reports).toEqual([
+      {
+        phase: 'bubble',
+        context: 'canvas',
+        attempts: [
+          { id: 'canvas.presentFromHere', outcome: { ran: false, why: 'Nothing is selected.' } },
+        ],
+      },
+      {
+        phase: 'bubble',
+        context: 'canvas',
+        attempts: [{ id: 'canvas.addResource', outcome: { ran: true } }],
+      },
+      { phase: 'bubble', context: 'canvas', attempts: [] },
+      { phase: 'bubble', context: 'off-screen', attempts: [] },
+    ]);
   });
 });

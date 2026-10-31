@@ -70,10 +70,10 @@ describe('the Presenting commands', () => {
     const dialog = document.createElement('div');
     dialog.setAttribute('role', 'dialog');
 
-    expect(answer.answer(pressOn(dialog, 'ArrowRight'))).toBe(false);
-    expect(answer.answer(pressOn(scrollsDown(), 'PageDown'))).toBe(false);
+    expect(answer.answer(pressOn(dialog, 'ArrowRight')).ran).toBe(false);
+    expect(answer.answer(pressOn(scrollsDown(), 'PageDown')).ran).toBe(false);
     expect(operations.advance).not.toHaveBeenCalled();
-    expect(answer.answer(pressOn(document.body, 'ArrowRight'))).toBe(true);
+    expect(answer.answer(pressOn(document.body, 'ArrowRight')).ran).toBe(true);
     expect(operations.advance).toHaveBeenCalledOnce();
   });
 });

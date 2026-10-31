@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { KeyboardShortcutsDialog } from '@project/ui';
 import { keyBelongsElsewhere } from '../key-bindings';
-import { useKeyAnswers } from '../key-dispatcher';
+import { KEPT_BY_TARGET } from '../canvas-commands';
+import { RAN, useKeyAnswers } from '../key-dispatcher';
 import { SHORTCUT_SHEET_DESCRIPTIONS, shortcutSections } from '../shortcut-sheet';
 
 /**
@@ -19,9 +20,9 @@ export function ShortcutSheet({ presenting }: { readonly presenting: boolean }) 
       {
         id: 'help.showShortcuts',
         answer: (event) => {
-          if (keyBelongsElsewhere(event)) return false;
+          if (keyBelongsElsewhere(event)) return KEPT_BY_TARGET;
           setOpen(true);
-          return true;
+          return RAN;
         },
       },
     ],
