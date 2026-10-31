@@ -1,38 +1,48 @@
 ---
 name: infinity-cube-authoring
-description: Write or change InfinityCube content as files — an Aggregate directory's `aggregate.json`, Space directories, `space.json` Maps, Graphs and Edges, Resource files and their Markdown, and `images/`. Use when writing or editing the files of a InfinityCube talk or design on disk rather than in the browser; setting InfinityCube up or starting a run is `infinity-cube-getting-started`.
+description: Write or change an InfinityCube Aggregate directory's files — a talk or design's `aggregate.json`, `space.json` Maps, Graphs and Edges, Resource files and their Markdown, `images/` — on disk or through a `pnpm cube mcp` server's tools. Use to add, change, connect or remove Resources, Maps, Graphs or Edges by hand, or to fix what `pnpm cube check` or a refused `pnpm cube run` reports. Setting InfinityCube up or starting a run is `infinity-cube-getting-started`.
 ---
 
 # Authoring an Aggregate directory
 
-An **Aggregate directory** is InfinityCube's on-disk form: `aggregate.json` naming the Meta Space, one directory per Space named for its Id, each holding `space.json` and a `resources/` directory of JSON Resource files (with a Markdown Resource's source in its `<id>.md` sidecar), and `images/` holding stored pictures. The complete reference is [`docs/aggregate-directory.md`](https://github.com/tobyhede/infinity-cube/blob/main/docs/aggregate-directory.md) in the InfinityCube repository. Read the copy in the clone you check with, since the format moves with the code and a newer reference can name keys an older clone refuses; read the link only when you have no clone. Read it before writing, and treat it as the authority on every key and rule; this skill is the order to work in and the traps.
+An **Aggregate directory** is InfinityCube's on-disk form: `aggregate.json` naming the Meta Space, one directory per Space named for its Id, each holding `space.json` and a `resources/` directory of JSON Resource files (with a Markdown Resource's source in its `<id>.md` sidecar), and `images/` holding stored pictures. The reference is [`docs/aggregate-directory.md`](https://github.com/tobyhede/infinity-cube/blob/main/docs/aggregate-directory.md): the authority on every key and rule. Read it before writing: the copy in your InfinityCube clone when you have one, since the format moves with the code and `main` may be ahead of that clone, otherwise the link. This skill is the order to work in and the traps.
+
+You reach the directory one of three ways, and each step says what differs:
+
+- **Shell:** you run commands, from an InfinityCube clone, with `<dir>` absolute. With no clone, make one where the person agrees: `git clone https://github.com/tobyhede/infinity-cube`, then `pnpm install` in it, with Node at the clone's `.node-version` and pnpm 9.
+- **MCP:** you have only the tools of a `pnpm cube mcp` server (`list_files`, `read_file`, `write_file`, `delete_file`, `check`), scoped to the directory, with paths relative to it. `read_file` and `write_file` take `encoding: "base64"` for a binary file.
+- **Neither:** you can write files but run nothing. Work as for MCP, and the directory ends unchecked.
 
 ## Steps
 
-1. **Stop the run.** If `pnpm cube run` is running on this directory, stop it (Ctrl-C, or SIGINT to the process group you started) and wait for it to exit. A running InfinityCube writes every file it owns from memory after every edit, so its next write replaces anything you change in those files underneath it.
-   Done when nothing is serving the directory: `if d=$(cd "<dir>" && pwd -P); then ps -Aww -o pid=,command= | sed -n 's/^ *\([0-9][0-9]*\) .*run-process.ts \(.*\) [0-9]* \(no-\)\{0,1\}open$/\1 \2/p' | while read -r pid held; do [ "$held" -ef "$d" ] && echo "$pid"; done; else echo "cannot enter <dir>"; fi`, with `<dir>` absolute, prints nothing. It prints the process id of each run on the directory, and `cannot enter <dir>` when `<dir>` is missing or mistyped. It compares directories, not spellings, so a trailing slash or a symlink on either side, in `<dir>` or in the path the run was started with, still matches, and a sibling sharing its prefix does not.
+1. **Stop the run.** After each edit made in the app, a `pnpm cube run` serving the directory writes it from memory, overwriting the files you changed and deleting Resource files you added. Stop it (Ctrl-C, or SIGINT to the process group you started) and wait for it to exit; a run you did not start, ask the person to stop.
+   - Shell: done when this prints nothing: `if d=$(cd "<dir>" && pwd -P); then ps -Aww -o pid=,command= | sed -n 's/^ *\([0-9][0-9]*\) .*run-process.ts \(.*\) [0-9]* \(no-\)\{0,1\}open$/\1 \2/p' | while read -r pid held; do [ "$held" -ef "$d" ] && echo "$pid"; done; else echo "cannot enter <dir>"; fi`. It prints the process id of each run on the directory, or `cannot enter <dir>` when `<dir>` is wrong.
+   - MCP or neither: done when the person confirms no run is serving the directory.
 
-2. **Read what is there.** If the directory exists, read `aggregate.json`, every Space's `space.json` and its Resource files, and check `git -C <dir> status` so your change starts from a clean or known state. A new directory needs an `aggregate.json`, and a Meta Space directory with a `space.json`, before anything else: `pnpm cube init <dir>` from the InfinityCube clone, with `<dir>` absolute, writes both to a missing or empty directory.
+2. **Read what is there.** Read `aggregate.json`, every Space's `space.json` and the Resource files you will touch. Shell: also run `git -C "<dir>" status`; if it is dirty or not a repository, ask the person to commit first, as `infinity-cube-getting-started` step 4 does. A new directory needs an aggregate first: shell, `pnpm cube init "<dir>"` writes a starter aggregate to a missing or empty directory; otherwise write `aggregate.json` and a Meta Space directory with a `space.json` from the reference.
    Done when you can name the Meta Space, every Space, and the Ids of the Maps, Graphs and Resources you will touch.
 
-3. **Write the change.** Follow the reference. The rules that most often refuse a hand-written directory:
-   - A Space's directory name **is** its Id: a lower-case UUID. Mint new UUIDs with `uuidgen | tr A-Z a-z` or `node -e 'console.log(crypto.randomUUID())'`.
-   - **Every Resource file has an `id`.** A Map's and a Graph's Ids may be left out and are minted on Import, but a minted Id cannot be referred to, so a Map or Graph needs its `id` if `defaultMap`, `activeGraph` or a Space Resource names it.
-   - A Resource is `resources/<id>.json`: `{ "id", "title", "kind", "content" }`, all four required. A Markdown Resource's `content` is `{ "path": "<id>.md", "mediaType": "text/markdown" }`, and its source is that plain `resources/<id>.md` beside it, with no frontmatter. Each kind's `content` is in the reference's table; `docs/schema/resource/examples/` has one file per kind.
-   - A Map's `positions` keys are its membership, and an Edge may only join Resources its Map positions.
-   - Every Map owns at least one Graph.
-   - Resource Ids are unique across the whole aggregate, not just within a Space.
-   - Every ordinary Space must be reached by a Space Resource (`"kind": "space"`, its `content` holding `spaceId`, `map` and `graph`, and an optional `framing` of `centreX`, `centreY` and `zoom` that Export writes for a framed one; keep it) somewhere else in the aggregate, so it needs a Map and a Graph for that Space Resource to name. Only the Meta Space may be written without Maps.
-   - Every object in `space.json` and every Resource file, `content` included, is strict: an unknown or misspelt key is refused, naming the key and the file.
-   - A picture is `images/<content-id>.<ext>`, named by the SHA-256 of its bytes; the reference shows the command. The Resource's `content.url` is `/images/<content-id>`.
-   - Keep prose that is not a Resource out of a Space directory and its `resources/`: a `*.md` there that is not a Markdown Resource's own sidecar is refused, naming it.
+3. **Write the change.** Follow the reference. The rules that most often refuse, or silently hide, a hand-written change:
+   - A Space's directory name **is** its Id, and every new Id is a lower-case UUID. Shell: mint with `node -e 'console.log(crypto.randomUUID())'`. Otherwise: write a random version-4 UUID in lower case.
+   - Resource Ids are unique across the whole aggregate, and Graph Ids across the whole Space.
+   - Give every Map and Graph you write an `id`; an Id Import mints cannot be referred to.
+   - A Resource is `resources/<id>.json`: `{ "id", "title", "kind", "content" }`, all four required. A Markdown Resource's `content` is `{ "path": "<id>.md", "mediaType": "text/markdown" }`, and its source is the plain `resources/<id>.md` beside it, with no frontmatter. Each kind's `content` is in the reference's table.
+   - A Resource appears on a Map only when that Map's `positions` holds it, and is presented only when an Edge of a Graph reaches it. `check` accepts a Resource on no Map, so place each new one and usually connect it.
+   - An Edge joins only Resources its Map positions, and every Map owns at least one Graph.
+   - Every ordinary Space is reached by a Space Resource elsewhere in the aggregate (`"kind": "space"`, `content` holding `spaceId`, `map` and `graph`), so it needs a Map and a Graph for that Resource to name. Only the Meta Space may have no Maps.
+   - Every object, `content` included, is strict: spell keys exactly as the reference does.
+   - A stored picture is `images/<content-id>.<ext>`: the content id is the SHA-256 of its bytes as unpadded base64url, not hex, and the extension is the format the bytes are (`png`, `jpg`, `webp`, `gif`); the reference shows the command. The Resource's `content.url` is `/images/<content-id>`. Without a shell, write a picture only when the person gives its bytes and content id (MCP: `write_file` with `encoding: "base64"`); otherwise use an `https:` URL.
+   - Keep notes outside Space directories: a `*.md` there that is not a Markdown Resource's sidecar is refused.
 
    Done when every file you meant to add or change is written.
 
-4. **Check it.** From the InfinityCube clone, with `<dir>` absolute: `pnpm cube check "<dir>"`. A relative `<dir>` is read from the clone, not from where the person's content is. It Imports the directory as a run does, so it refuses what a run would refuse, and it serves and writes nothing, so it is safe on the person's files. An accepted directory prints `<dir> is a valid aggregate.` and exits zero. A refused one exits non-zero and prints each problem, naming a file by its path and a broken reference by its Space and Ids; fix them in `<dir>` and check again, since a second round of problems can follow the first.
-   If you reach the directory only through the tools of a `pnpm cube mcp` server, call its `check` tool instead; it answers the same text. The person starts that server from the clone with `pnpm --silent cube mcp "<dir>"`, as the reference's "Editing over MCP" shows, and step 1 holds for it too: a run serving the directory overwrites what its tools write.
-   With no InfinityCube clone at hand, make one where the person agrees to: `git clone https://github.com/tobyhede/infinity-cube` and `pnpm install` in it, which needs Node 26.8.1 or later and pnpm 9. If you cannot run commands at all, as in a chat with no shell and no `cube mcp` server, say that the directory is unchecked and ask the person to run `pnpm cube check` before they commit it.
-   Done when `pnpm cube check` exits zero or the `check` tool answers that the directory is valid, or you have told the person it is unchecked.
+4. **Check it.** Shell: `pnpm cube check "<dir>"` from the clone. MCP: call `check`. Both Import the directory as a run does and write nothing. Accepted answers `<dir> is a valid aggregate.`; refused lists each problem by file path or by Space and Ids. Fix and check again until it is accepted, since fixing one round can reveal the next.
+   Neither: ask the person to set up a clone and run the check, or to start a `cube mcp` server as [Editing over MCP](https://github.com/tobyhede/infinity-cube/blob/main/docs/aggregate-directory.md#editing-over-mcp) shows; failing both, tell the person the directory is unchecked and ask them to run `pnpm cube check` before they commit it.
+   Done when the check answers that the directory is valid, or you have told the person it is unchecked.
 
-5. **Expect the canonical rewrite.** InfinityCube rewrites what it reads in a fixed form the first time an edit is written: every Resource becomes `resources/<id>.json` (and a Markdown Resource's source `resources/<id>.md`) in a fixed key order, minted Ids are filled in, and opening a Space that names no `defaultMap` records one, which is itself an edit. Starting and stopping a run with no edit changes nothing. Tell the person to review the diff and commit in the content directory's own repository.
-   Done when `git -C <dir> status` shows only the changes you intended plus, after an edit in the browser, that rewrite.
+5. **Hand over.** Tell the person:
+   - to review the diff and commit in the content directory's own repository;
+   - to start the run again (`pnpm cube run "<dir>"`) to see the change, since a run reads the directory only when it starts;
+   - that the first edit a run writes rewrites the directory in canonical form: every Resource as `resources/<id>.json` in a fixed key order, minted Ids filled in, and a `defaultMap` recorded for a Space opened without one.
+
+   Done when the person has been told all three.
