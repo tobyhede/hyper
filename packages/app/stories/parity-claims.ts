@@ -422,6 +422,13 @@ export const parityClaims: readonly ParityClaim[] = [
       "Exactly one authored Map is the one drawing the canvas, chosen from the Map cluster's single exclusive list, which names the chosen one on the cluster itself.",
   },
   {
+    id: 'command-dock-chooses-theme',
+    storyFile: 'space/command-dock.stories.tsx',
+    storyExport: 'Themed',
+    claim:
+      "The Dock's last cluster chooses the page's theme from one exclusive list of Light, Dark and System, System until chosen; the choice turns the page over at once and outlives a reload.",
+  },
+  {
     id: 'command-dock-adds-an-empty-map',
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',

@@ -7,6 +7,8 @@
  * stops iframing these stories. The repetition is the constraint, not an oversight.
  */
 import type { Story } from '@ladle/react';
+import { ColorSchemeContext } from '#src/color-scheme';
+import { catalogueColorScheme } from '../support/catalogue-color-scheme';
 import { CommandDockFixture, LeftDockFixture } from '../support/CommandDockFixture';
 
 export default { title: 'Space/Command Dock' };
@@ -27,6 +29,18 @@ export default { title: 'Space/Command Dock' };
  */
 export const Default: Story = () => <CommandDockFixture />;
 Default.meta = { iframed: true };
+
+/**
+ * The Dock as the application's entries compose it, with the page's theme to
+ * choose: the last cluster offers Light, Dark and System, and the choice
+ * outlives a reload.
+ */
+export const Themed: Story = () => (
+  <ColorSchemeContext.Provider value={catalogueColorScheme}>
+    <CommandDockFixture />
+  </ColorSchemeContext.Provider>
+);
+Themed.meta = { iframed: true };
 
 /** The same application after choosing the left edge from the Dock position menu. */
 export const DockedLeft: Story = () => <LeftDockFixture />;

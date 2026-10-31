@@ -7,10 +7,13 @@ import { createSpaceStartup } from './space';
 import { Application } from './components/Application';
 import { createBrowserFullscreen } from './browser-fullscreen';
 import { createBrowserPresentationLinks } from './browser-presentation-channel';
+import { createBrowserColorScheme } from './browser-color-scheme';
+import { ColorSchemeContext } from './color-scheme';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error('Root element #root not found');
 
+const colorScheme = createBrowserColorScheme(window);
 const root = createRoot(rootElement);
 const spaceStartup = createSpaceStartup(
   createBrowserFullscreen(document),
@@ -21,4 +24,8 @@ const spaceStartup = createSpaceStartup(
     locks: 'locks' in navigator ? navigator.locks : undefined,
   }),
 );
-root.render(<Application resolve={() => spaceStartup.resolve(window.location.pathname)} />);
+root.render(
+  <ColorSchemeContext.Provider value={colorScheme}>
+    <Application resolve={() => spaceStartup.resolve(window.location.pathname)} />
+  </ColorSchemeContext.Provider>,
+);

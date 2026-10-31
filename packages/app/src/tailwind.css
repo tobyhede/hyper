@@ -1,6 +1,15 @@
 @import 'tailwindcss';
 
 /*
+ * `dark:` follows the theme drawn, `data-theme="dark"` on the root element,
+ * rather than the system preference alone, so a reader who chooses a theme in
+ * the Command Dock turns the registry components over with the tokens
+ * `theme-dark.css` restates. `color-scheme.ts` sets the attribute.
+ */
+/* stylelint-disable-next-line scss/at-rule-no-unknown -- Tailwind CSS v4 directive */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/*
  * The shared semantic vocabulary consumed by the app, `@project/ui`, and the
  * React Flow integration.
  */
