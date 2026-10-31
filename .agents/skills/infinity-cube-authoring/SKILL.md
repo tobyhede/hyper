@@ -5,7 +5,7 @@ description: Write or change InfinityCube content as files — an Aggregate dire
 
 # Authoring an Aggregate directory
 
-An **Aggregate directory** is InfinityCube's on-disk form: `aggregate.json` naming the Meta Space, one directory per Space named for its Id, each holding `space.json` and a `resources/` directory of JSON Resource files (with a Markdown Resource's source in its `<id>.md` sidecar), and `images/` holding stored pictures. The complete reference is [`docs/aggregate-directory.md`](../../../docs/aggregate-directory.md) in the InfinityCube repository. Read it before writing, and treat it as the authority on every key and rule; this skill is the order to work in and the traps.
+An **Aggregate directory** is InfinityCube's on-disk form: `aggregate.json` naming the Meta Space, one directory per Space named for its Id, each holding `space.json` and a `resources/` directory of JSON Resource files (with a Markdown Resource's source in its `<id>.md` sidecar), and `images/` holding stored pictures. The complete reference is [`docs/aggregate-directory.md`](https://github.com/tobyhede/hyper/blob/main/docs/aggregate-directory.md) in the InfinityCube repository; when you are working in a clone of it, read the copy there. Read it before writing, and treat it as the authority on every key and rule; this skill is the order to work in and the traps.
 
 ## Steps
 
@@ -30,7 +30,8 @@ An **Aggregate directory** is InfinityCube's on-disk form: `aggregate.json` nami
    Done when every file you meant to add or change is written.
 
 4. **Check it.** From the InfinityCube clone: `pnpm cube check "<dir>"`. It reads the directory exactly as a run would, and serves and writes nothing, so it is safe on the person's files. An accepted directory prints `<dir> is a valid aggregate.` and exits zero. A refused one exits non-zero and prints each problem, naming a file by its path and a broken reference by its Space and Ids; fix them in `<dir>` and check again, since a second round of problems can follow the first.
-   Done when `pnpm cube check` exits zero.
+   With no InfinityCube clone at hand, make one where the person agrees to: `git clone https://github.com/tobyhede/hyper` and `pnpm install` in it, which needs Node 26.8.1 or later and pnpm 9. If you cannot run commands at all, as in a chat with no shell, say that the directory is unchecked and ask the person to run `pnpm cube check` before they commit it.
+   Done when `pnpm cube check` exits zero, or you have told the person it is unchecked.
 
 5. **Expect the canonical rewrite.** InfinityCube rewrites what it reads in a fixed form the first time an edit is written: every Resource becomes `resources/<id>.json` (and a Markdown Resource's source `resources/<id>.md`) in a fixed key order, minted Ids are filled in, and opening a Space that names no `defaultMap` records one, which is itself an edit. Starting and stopping a run with no edit changes nothing. Tell the person to review the diff and commit in the content directory's own repository.
    Done when `git -C <dir> status` shows only the changes you intended plus, after an edit in the browser, that rewrite.

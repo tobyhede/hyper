@@ -91,6 +91,21 @@ describe('commands in the InfinityCube getting-started and authoring skills', ()
   });
 });
 
+// `infinity-cube-authoring` is installed outside this repository too (Claude.ai,
+// a content repository, Codex), where a repository-relative link leads nowhere.
+describe('links in the infinity-cube-authoring skill', () => {
+  it('reach the reference from outside the repository', () => {
+    const targets = [...readSkill('infinity-cube-authoring').matchAll(/\]\(([^)]+)\)/g)].map(
+      (match) => match[1] ?? '',
+    );
+
+    expect(targets).toContain(
+      'https://github.com/tobyhede/hyper/blob/main/docs/aggregate-directory.md',
+    );
+    expect(targets.filter((target) => !target.startsWith('https://'))).toEqual([]);
+  });
+});
+
 // The documented check, run as written by `sh` against a live process whose
 // arguments are the run's. `<dir>` is spelled through `$INFINITY_CUBE_DIR`, so the
 // shell's own command line never holds the directory and cannot match itself.

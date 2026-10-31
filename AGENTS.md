@@ -102,7 +102,7 @@ Keep to the MVP. Don't over-generalize the domain model and don't add features b
 
 ### Workflow
 
-How work moves from a question to committed code: the grilling loop, when a decision earns an ADR, the rename rule, the verification bar. See `docs/agents/workflow.md`. The skills themselves are **tracked**: the files under `.agents/skills/` (where Codex looks), symlinked from `.claude/skills/` (where Claude Code looks). `shadcn` is vendored from `shadcn/ui`, pinned by `skills-lock.json` and patched locally; `shadcn-first-ui`, `infinity-cube-authoring` and `infinity-cube-getting-started` are owned and reviewed here, and the lock does not pin them. Both harnesses' paths are tracked deliberately — tracking one fixes only one. `workflow.md` is the prose copy of the process, because no skill here carries the loop.
+How work moves from a question to committed code: the grilling loop, when a decision earns an ADR, the rename rule, the verification bar. See `docs/agents/workflow.md`. The skills themselves are **tracked**: the files under `.agents/skills/` (where Codex looks), symlinked from `.claude/skills/` (where Claude Code looks). `shadcn` is vendored from `shadcn/ui`, pinned by `skills-lock.json` and patched locally; `shadcn-first-ui`, `infinity-cube-authoring` and `infinity-cube-getting-started` are owned and reviewed here, and the lock does not pin them. `infinity-cube-authoring` is also installed outside this repository, by copying or zipping its directory, so it links only by absolute URL; `test/unit/agent-skill-commands.test.ts` holds that. Both harnesses' paths are tracked deliberately — tracking one fixes only one. `workflow.md` is the prose copy of the process, because no skill here carries the loop.
 
 ### Editing & persistence
 
