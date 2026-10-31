@@ -131,6 +131,10 @@
 }
 
 .markdown-resource-body--editing {
+  /* A press here places the caret and a drag selects text: it never moves the
+     Resource, so the pointer says text rather than the grab hand the rest of
+     the Resource shows. */
+  cursor: text;
   --markdown-source-content-inset: var(--markdown-resource-content-gap);
   --markdown-source-content-padding-top: var(--markdown-resource-content-top);
   --markdown-source-focus-outline: none;
@@ -171,19 +175,17 @@
 
    No panel behind it: the Resource's face is a shade darker than the editor's own
    surface, so a filled backing reads as a grey box floated over the document.
-   It sits in the reserved band above the first line instead.
+   It is a row of its own under the editor instead, so it never sits on the
+   author's text, however small the Resource is drawn.
 
    Grouping is the second rule: one gap holds a cap to its word, a wider one
    separates the pairs, so the eye takes `⌘+↵ Save` and `Esc Cancel` as two
    resources rather than one run. */
 .markdown-resource-body__shortcut-hint {
-  position: absolute;
-  inset-block-start: 0;
-  inset-inline-end: 10px;
-  /* Sits in the band the body's own top inset opens, so tightening that inset
-     brings the hint up with the text rather than leaving it stranded. */
-  height: calc(var(--markdown-resource-content-top) * 2 + 10px);
-  z-index: 2;
+  flex: none;
+  align-self: flex-end;
+  height: 22px;
+  padding-inline-end: 10px;
   display: flex;
   align-items: center;
   gap: 14px;

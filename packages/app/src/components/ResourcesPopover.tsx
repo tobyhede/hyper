@@ -803,7 +803,7 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
           side={side}
           align="center"
           sideOffset={6}
-          className="nokey w-72 p-0"
+          className="nokey w-80 p-0"
           aria-label={surfaceName}
           anchor={connecting?.anchor}
           // The Connect list has no trigger, so it returns the caret to its anchor.

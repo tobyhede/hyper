@@ -18,6 +18,12 @@ export interface KindFlags {
   readonly takesResourceShape: boolean;
   /** Whether a Resource of this kind may be Open (ADR 0122). */
   readonly canOpen: boolean;
+  /**
+   * Whether Opening a Resource of this kind that was never resized grows it to
+   * its content, as a note is unfolded to be read. Content that fits any rect —
+   * a picture, a Map — Opens at the size it has.
+   */
+  readonly opensToFit: boolean;
   /** Whether another Resource may reference one of this kind as its Target, which keeps referencing a single hop (ADR 0113). */
   readonly mayBeTarget: boolean;
   /** Whether a Space this kind references lives by that reference, and is deleted with its last (ADR 0074). */

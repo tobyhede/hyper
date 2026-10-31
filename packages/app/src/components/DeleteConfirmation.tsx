@@ -1,4 +1,4 @@
-import { useRef, useState, useSyncExternalStore } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,9 +35,10 @@ import type {
  * viewport less its own padding where that is less; the title and the two
  * answers keep their height and the reach scrolls in what is left. The reach is
  * focusable so a keyboard reader can scroll it, which would make it where the
- * dialog opens — so the caret opens on Cancel. `DeleteResourceConfirmation.test.tsx`
- * holds the opening caret, and `ladle-e2e/delete-confirmation.spec.ts` the
- * scrolling.
+ * dialog opens — so the caret opens on Delete, the answer the reader armed the
+ * question to give: Enter confirms, and Escape or Cancel is one key away.
+ * `DeleteResourceConfirmation.test.tsx` holds the opening caret, and
+ * `ladle-e2e/delete-confirmation.spec.ts` the scrolling.
  *
  * **Closing returns the caret to the control that armed it while that control
  * is still in the document**, whichever answer closed it. A completed deletion
@@ -71,7 +72,6 @@ export function DeleteConfirmation({
       ? active
       : null;
   });
-  const reachRegion = useRef<HTMLElement>(null);
   const reaches = reach.length > 0;
   return (
     <AlertDialog
@@ -88,10 +88,13 @@ export function DeleteConfirmation({
           'max-h-[min(32rem,calc(100dvh-2*var(--alert-dialog-spacing)))]',
           reaches && 'grid-rows-[auto_minmax(0,1fr)_auto]',
         )}
+        // Found by its slot rather than a ref: the action is a function
+        // component, which React 18 hands no ref, and the dialog is modal, so
+        // its action is the only one in the document.
         initialFocus={() =>
-          reachRegion.current
-            ?.closest('[data-slot=alert-dialog-content]')
-            ?.querySelector<HTMLElement>('[data-slot=alert-dialog-cancel]') ?? true
+          document.querySelector<HTMLElement>(
+            '[data-slot=alert-dialog-content] [data-slot=alert-dialog-action]',
+          ) ?? true
         }
         finalFocus={() => returnFocusTo(opener?.isConnected ? opener : (focusFallback?.() ?? null))}
       >
@@ -106,7 +109,6 @@ export function DeleteConfirmation({
         </AlertDialogHeader>
         {reaches ? (
           <section
-            ref={reachRegion}
             aria-label="What the deletion reaches"
             tabIndex={0}
             className="min-h-0 overflow-y-auto rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"

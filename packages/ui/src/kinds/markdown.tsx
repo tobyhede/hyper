@@ -44,6 +44,7 @@ const markdownCanvas = (content: MarkdownContent, area: CanvasArea) => {
       <MarkdownResourceBody
         source={content.source}
         ariaLabel={`Markdown source of ${area.name}`}
+        drawnName={area.name}
         {...body}
       />
     </ResourceContentEditProvider>
@@ -64,8 +65,8 @@ export const markdownView: KindView<MarkdownOperations, MarkdownContent> = {
   bareOperations: { kind: markdownKind.id },
   contentCommand: { label: (name) => `Edit Resource ${name}`, Icon: EditIcon },
   canvas: markdownCanvas,
-  presented: (_name, content) => (
-    <RenderedMarkdown className="resource__body" markdown={content.source} />
+  presented: (name, content) => (
+    <RenderedMarkdown className="resource__body" markdown={content.source} drawnName={name} />
   ),
 };
 

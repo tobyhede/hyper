@@ -268,6 +268,67 @@ describe('render adapter', () => {
   });
 
   /*
+   * A modifier click or a selection box adds to React Flow's selection without
+   * deselecting what it held: the latest Resource is the subject, and the rest
+   * stay selected beside it so a drag moves them all.
+   */
+  describe('Resources selected together', () => {
+    const selectedIds = (store: RenderAdapter) =>
+      store
+        .getState()
+        .projection?.nodes.filter((each) => each.selected === true)
+        .map((each) => each.id);
+
+    it('keeps the Resources React Flow holds selected, with the latest as the subject', () => {
+      const store = adapter();
+      store.getState().syncProjection(PROJECTED, [EDGE]);
+
+      store.getState().changeNodes([{ type: 'select', id: RESOURCE_A, selected: true }]);
+      store.getState().changeNodes([{ type: 'select', id: RESOURCE_B, selected: true }]);
+
+      expect(store.getState().selection).toEqual({ kind: 'resource', resourceId: RESOURCE_B });
+      expect(selectedIds(store)).toEqual([RESOURCE_A, RESOURCE_B]);
+    });
+
+    it('makes another of them the subject when the subject is taken off the selection', () => {
+      const store = adapter();
+      store.getState().syncProjection(PROJECTED, [EDGE]);
+      store.getState().changeNodes([{ type: 'select', id: RESOURCE_A, selected: true }]);
+      store.getState().changeNodes([{ type: 'select', id: RESOURCE_B, selected: true }]);
+
+      store.getState().changeNodes([{ type: 'select', id: RESOURCE_B, selected: false }]);
+
+      expect(store.getState().selection).toEqual({ kind: 'resource', resourceId: RESOURCE_A });
+      expect(selectedIds(store)).toEqual([RESOURCE_A]);
+    });
+
+    it('keeps them selected through a reprojection', () => {
+      const store = adapter();
+      store.getState().syncProjection(PROJECTED, [EDGE]);
+      store.getState().changeNodes([{ type: 'select', id: RESOURCE_A, selected: true }]);
+      store.getState().changeNodes([{ type: 'select', id: RESOURCE_B, selected: true }]);
+
+      store.getState().syncProjection(PROJECTED, [EDGE]);
+
+      expect(selectedIds(store)).toEqual([RESOURCE_A, RESOURCE_B]);
+    });
+
+    it('drops them all when an Edge or a Resource is selected from outside React Flow', () => {
+      const store = adapter();
+      store.getState().syncProjection(PROJECTED, [EDGE]);
+      store.getState().changeNodes([{ type: 'select', id: RESOURCE_A, selected: true }]);
+      store.getState().changeNodes([{ type: 'select', id: RESOURCE_B, selected: true }]);
+
+      store.getState().selectResource(RESOURCE_A);
+      expect(selectedIds(store)).toEqual([RESOURCE_A]);
+
+      store.getState().changeNodes([{ type: 'select', id: RESOURCE_B, selected: true }]);
+      store.getState().changeEdges([{ type: 'select', id: EDGE.id, selected: true }]);
+      expect(selectedIds(store)).toEqual([]);
+    });
+  });
+
+  /*
    * **One React Flow selection action produces two callback batches.** It selects
    * the new subject and then deselects the other kind, and the second batch names
    * a subject the union has already moved past. Reading the last change would

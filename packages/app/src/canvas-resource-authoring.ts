@@ -150,6 +150,12 @@ export interface CanvasResourceAuthoringInput {
    */
   readonly portalEditing?: ReadonlySet<ResourceId>;
   readonly onPortalEditingChange?: ((resourceId: ResourceId, editing: boolean) => void) | undefined;
+  /**
+   * Open a Resource grown to its content, answering nothing where a plain Open
+   * serves. Only the canvas's own Map offers it, because growing centres its
+   * camera; absent, every Open is the plain Open Edit.
+   */
+  readonly openToFit?: (resourceId: ResourceId) => 'completed' | 'retained' | undefined;
 }
 
 export interface CanvasResourceAuthoring {
@@ -188,6 +194,7 @@ export function useCanvasResourceAuthoring({
   resourceEntityActions,
   portalEditing,
   onPortalEditingChange,
+  openToFit,
 }: CanvasResourceAuthoringInput): CanvasResourceAuthoring {
   const spaces = useOpenSpaces();
   const [contextEditingIds, setContextEditingIds] = useState<ReadonlySet<ResourceId>>(
@@ -274,10 +281,12 @@ export function useCanvasResourceAuthoring({
       // an Ur Resource has none to show, so Enter or Space on one asks nothing.
       // `takesOpen` is the domain's one answer, which intake and the Edit ask too.
       if (stored === undefined || !takesOpen(stored.document.kind)) return 'retained';
+      const fitted = openToFit?.(resourceId.data);
+      if (fitted !== undefined) return fitted;
       const result = authoring.complete({ kind: 'opened-resource', resourceId: resourceId.data });
       return result.kind === 'completed' || result.kind === 'unchanged' ? 'completed' : 'retained';
     },
-    [authoring, availability.authorOnCanvas, spaceSession],
+    [authoring, availability.authorOnCanvas, spaceSession, openToFit],
   );
 
   const closeResource = useCallback(

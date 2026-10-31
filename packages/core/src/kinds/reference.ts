@@ -27,6 +27,7 @@ export const referenceKind = defineKind({
   flags: {
     takesResourceShape: false,
     canOpen: true,
+    opensToFit: false,
     mayBeTarget: false,
     ownsReferencedSpaces: false,
   },

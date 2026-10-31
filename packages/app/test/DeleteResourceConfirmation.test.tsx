@@ -134,7 +134,7 @@ describe('the question Delete from Space asks', () => {
       expect(screen.queryByRole('list')).toBeNull();
     });
 
-    it('opens on Cancel, with the reach a focusable region of its own', async () => {
+    it('opens on Delete, with the reach a focusable region of its own', async () => {
       ask(
         subject,
         deletionReach(
@@ -145,7 +145,7 @@ describe('the question Delete from Space asks', () => {
 
       const question = screen.getByRole('alertdialog');
       await waitFor(() =>
-        expect(within(question).getByRole('button', { name: 'Cancel' })).toHaveFocus(),
+        expect(within(question).getByRole('button', { name: 'Delete' })).toHaveFocus(),
       );
       expect(
         within(question).getByRole('region', { name: 'What the deletion reaches' }),

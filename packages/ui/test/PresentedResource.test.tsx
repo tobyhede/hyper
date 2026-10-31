@@ -43,6 +43,34 @@ describe('PresentedResource', () => {
     },
   );
 
+  it('leaves out a first heading that repeats the name drawn above it', () => {
+    const { container } = render(
+      <PresentedResource
+        title={'The  Problem\nWhy it matters'}
+        content={{
+          kind: 'markdown',
+          source: '\n# the problem\n\nBody.\n\n## The problem',
+          via: 'self',
+        }}
+      />,
+    );
+
+    expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(2);
+    expect(container.querySelector('.resource__body h1')).toBeNull();
+    expect(container.querySelector('.resource__body p')?.textContent).toBe('Body.');
+  });
+
+  it('keeps a first heading that says something other than the name', () => {
+    const { container } = render(
+      <PresentedResource
+        title="The problem"
+        content={{ kind: 'markdown', source: '# A different heading\n\nBody.', via: 'self' }}
+      />,
+    );
+
+    expect(container.querySelector('.resource__body h1')?.textContent).toBe('A different heading');
+  });
+
   it('draws a setext underline as a heading, with no hr for the Stage to read', () => {
     const { container } = render(
       <PresentedResource

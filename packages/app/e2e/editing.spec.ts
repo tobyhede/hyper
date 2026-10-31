@@ -495,7 +495,13 @@ test('the opened Resource draws Markdown and its editor on the same paper surfac
   );
 });
 
-test('opened Markdown editing persists source while Opening and Closing move no Resource', async ({
+/**
+ * A Markdown Resource Opens like a note unfolded to be read: never resized, it
+ * grows to its content and the Resources its growth passes make room. Editing
+ * and Closing then move nothing, and Closing keeps the size, so a second Open
+ * changes only what the Resource draws.
+ */
+test('Opening an unresized Markdown Resource grows it to its content, and Closing keeps that size', async ({
   page,
 }) => {
   await page.goto('/');
@@ -504,13 +510,20 @@ test('opened Markdown editing persists source while Opening and Closing move no 
   await expect(resource).toBeVisible();
   await settled(page);
   const before = await allPositions(page);
+  const closedBox = await resource.boundingBox();
   const openedId = await resource.getAttribute('data-id');
+  expect(openedId).not.toBeNull();
 
   await openResource(resource, 'A');
+  await expect(resource.locator('.canvas-resource[data-open="true"]')).toHaveCount(1);
+  await settled(page);
   const opened = await allPositions(page);
-  // Opening changes what the Resource draws and no rect: nothing moves.
-  expect(opened).toEqual(before);
-  expect(openedId).not.toBeNull();
+  const openBox = await resource.boundingBox();
+  expect(openBox?.width ?? 0).toBeGreaterThan(closedBox?.width ?? 0);
+  // It grows from its own top-left corner; what its growth passes moves.
+  expect(opened[openedId ?? '']).toEqual(before[openedId ?? '']);
+  expect(opened).not.toEqual(before);
+
   await (await controls(resource)).getByRole('button', { name: 'Edit Resource A' }).click();
   await page.getByRole('textbox', { name: 'Markdown source of A' }).fill('# Edited\n\nNew source');
   await (await controls(resource)).getByRole('button', { name: 'Save Resource A' }).click();
@@ -520,7 +533,14 @@ test('opened Markdown editing persists source while Opening and Closing move no 
   expect(await allPositions(page)).toEqual(opened);
 
   await (await controls(resource)).getByRole('button', { name: 'Close Resource A' }).click();
-  expect(await allPositions(page)).toEqual(before);
+  await expect(resource.locator('.canvas-resource[data-open="true"]')).toHaveCount(0);
+  expect(await allPositions(page)).toEqual(opened);
+  expect((await resource.boundingBox())?.width).toBeCloseTo(openBox?.width ?? 0, 0);
+
+  // Sized now, so Opening again changes what it draws and no rect.
+  await openResource(resource, 'A');
+  await expect(resource.locator('.canvas-resource[data-open="true"]')).toHaveCount(1);
+  expect(await allPositions(page)).toEqual(opened);
 
   await page.reload();
   const persisted = nodeByTitle(page, 'A').first();
@@ -2095,7 +2115,7 @@ test(
     await expect(
       reach.getByRole('list', { name: 'Collection 1' }).getByRole('listitem'),
     ).toHaveText(['Long', 'Mid', 'Short']);
-    await expect(confirmation.getByRole('button', { name: 'Cancel' })).toBeFocused();
+    await expect(confirmation.getByRole('button', { name: 'Delete', exact: true })).toBeFocused();
 
     await confirmation.getByRole('button', { name: 'Cancel' }).click();
     await expect(nodeByTitle(page, 'B')).toBeVisible();

@@ -48,6 +48,11 @@ export interface MarkdownResourceBodyProps {
   readonly source: string;
   /** Names the writing surface for a screen reader, e.g. the Resource's title. */
   readonly ariaLabel: string;
+  /**
+   * The name the Resource draws beside its body. A first heading that only
+   * repeats it is left out of the rendered body; the source keeps it.
+   */
+  readonly drawnName?: string;
   /** Activates source editing from a pointer press on the rendered body. */
   readonly onBeginEdit?: () => void;
   /** The live edit, absent when the source is at rest. */
@@ -102,6 +107,7 @@ export interface MarkdownResourceBodyProps {
 export function MarkdownResourceBody({
   source,
   ariaLabel,
+  drawnName,
   onBeginEdit,
   editor,
   autoFocus = true,
@@ -283,6 +289,7 @@ export function MarkdownResourceBody({
         <>
           <RenderedMarkdown
             markdown={source}
+            drawnName={drawnName}
             className="markdown-resource-body__rendered resource__body"
           />
           {onBeginEdit !== undefined && (

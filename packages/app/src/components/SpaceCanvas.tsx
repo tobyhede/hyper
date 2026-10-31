@@ -27,11 +27,13 @@ import {
   type OnNodesChange,
   useReactFlow,
   useStore,
+  useStoreApi,
 } from '@xyflow/react';
 import {
   DEFAULT_KIND,
   COLLAPSED_RESOURCE_SIZE,
   isAcceptedImageUrl,
+  opensToFit,
   takesOpen,
   titleName,
   uuidSchema,
@@ -527,14 +529,14 @@ export function SpaceCanvas({
    * so only its own Map's Resources are given it.
    */
   const openAndExpand = useCallback(
-    (resourceId: ResourceId): void => {
+    (resourceId: ResourceId): 'completed' | 'retained' => {
       // Read when pressed, so the action factory below is not rebuilt on every
       // projection a drag or a selection publishes.
       const node = latestNodes.current.find((each) => each.data.resourceId === resourceId);
       const resource = view.space.lookup.resource(resourceId);
       const area = canvasRef.current;
-      if (node === undefined || resource === undefined || area === null) return;
-      if (!takesOpen(resource.kind)) return;
+      if (node === undefined || resource === undefined || area === null) return 'retained';
+      if (!takesOpen(resource.kind)) return 'retained';
       const zoom = getZoom();
       const content = resolveResourceContent(view.space, resource);
       const size = openAndExpandSize(
@@ -546,15 +548,34 @@ export function SpaceCanvas({
         (at) => openHeight(area, node, content, at),
       );
       const result = authoring.complete({ kind: 'opened-resource-to-fit', resourceId, size });
-      if (result.kind === 'refused') return;
+      if (result.kind === 'refused') return 'retained';
       // Issued, never awaited (ADR 0043). The Resource's top-left stays where
       // it is, so its new rect is known before the projection draws it.
       void setCenter(node.position.x + size.width / 2, node.position.y + size.height / 2, {
         zoom,
         duration: 0,
       });
+      return 'completed';
     },
     [view.space, getZoom, setCenter, authoring],
+  );
+  /**
+   * Open on the canvas's own Map, front to back like a card: a Resource whose
+   * kind opens to fit and that was never resized Opens grown to its content, as
+   * Open and expand does, so it is read in the box rather than in two lines of
+   * the Closed Size; one the author has sized Opens at that size. Answers
+   * nothing where the plain Open Edit serves.
+   */
+  const openToFit = useCallback(
+    (resourceId: ResourceId): 'completed' | 'retained' | undefined => {
+      const resource = view.space.lookup.resource(resourceId);
+      return resource !== undefined &&
+        opensToFit(resource.kind) &&
+        view.selectedMap.map.positions[resourceId]?.size === undefined
+        ? openAndExpand(resourceId)
+        : undefined;
+    },
+    [view.space, view.selectedMap, openAndExpand],
   );
   /** Present from Here, on the canvas's own Map: what `P` and the rail item both run. */
   const presentFromHere = useMemo(
@@ -647,6 +668,7 @@ export function SpaceCanvas({
     pickImages,
     spaceResourceTargets,
     resourceEntityActions: resourceActions,
+    openToFit,
     portalEditing: editingPortals,
     onPortalEditingChange,
   });
@@ -1192,9 +1214,15 @@ export function SpaceCanvas({
     () => [...edgeSurface.edges, ...liveEmbeddings.flatMap((value) => value.edges)],
     [edgeSurface.edges, liveEmbeddings],
   );
+  const flowStore = useStoreApi();
   const changeCanvasEdges = useCallback<OnEdgesChange>(
     (changes) => {
+      // A selection box selects the Edges between the Resources it takes as
+      // well. An Edge is selected alone, so the box leaves them out and selects
+      // only the Resources.
+      const boxing = flowStore.getState().userSelectionActive;
       const rootChanges = changes.filter((change) => {
+        if (boxing && change.type === 'select' && change.selected) return false;
         if (change.type === 'add') return true;
         const owner = liveEmbeddings.find((value) =>
           value.edges.some((edge) => edge.id === change.id),
@@ -1211,7 +1239,7 @@ export function SpaceCanvas({
       });
       changeEdges(rootChanges);
     },
-    [liveEmbeddings, changeEdges],
+    [liveEmbeddings, changeEdges, flowStore],
   );
   // A stable identity, or React Flow warns of a fresh `edgeTypes` object (#002).
   const canvasEdgeTypes = useMemo(
@@ -1486,7 +1514,17 @@ export function SpaceCanvas({
       if (node !== undefined)
         return {
           occurrence: removal,
-          subject: { kind: 'resource' as const, resourceId: node.data.resourceId },
+          subject: {
+            kind: 'resource' as const,
+            resourceId: node.data.resourceId,
+            // The Resources selected with it go too, when the key lands on one
+            // of the selection rather than on a Resource outside it.
+            alongside: node.selected
+              ? occurrence.nodes.flatMap((each) =>
+                  each.selected && each.id !== node.id ? [each.data.resourceId] : [],
+                )
+              : [],
+          },
         };
       return occurrence.selection.kind === 'edge'
         ? { occurrence: removal, subject: { kind: 'edge' as const } }

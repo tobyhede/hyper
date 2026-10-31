@@ -1240,7 +1240,7 @@ describe('the React Flow properties', () => {
     expect(result.current.reactFlowProps).toBe(first);
   });
 
-  it('configures the deletion, reconnection and single-selection policy', () => {
+  it('configures the deletion, reconnection and selection policy', () => {
     const composed = compose();
     const { result } = renderHook(
       () =>
@@ -1266,9 +1266,10 @@ describe('the React Flow properties', () => {
       // No Edge's end can be moved; focusability is per-Edge, Active Graph only.
       edgesReconnectable: false,
       edgesFocusable: false,
-      // Version 1 authors one element at a time.
-      multiSelectionKeyCode: null,
-      selectionKeyCode: null,
+      // Resources are selected together by a modifier click or a Shift drag's
+      // box; a plain drag still pans.
+      multiSelectionKeyCode: ['Shift', 'Meta', 'Control'],
+      selectionKeyCode: 'Shift',
       selectionOnDrag: false,
     });
   });

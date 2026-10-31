@@ -92,6 +92,7 @@ export const markdownKind = defineKind({
   flags: {
     takesResourceShape: false,
     canOpen: true,
+    opensToFit: true,
     mayBeTarget: true,
     ownsReferencedSpaces: false,
   },
