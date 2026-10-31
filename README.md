@@ -67,7 +67,7 @@ The other two, `shadcn-first-ui` and `shadcn`, are for developing InfinityCube's
 
 ### Installing the skills elsewhere
 
-A clone of this repository already has the skills. To use them from another directory, such as a talk's own repository, install the plugin from this repository's marketplace, `infinity-cube`. Both products install at user scope, so the skills are available in every project, and cache the plugin by version, so a change reaches installed copies only when the version in all three of `plugins/infinity-cube/plugin.json`, `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` is bumped (`test/unit/skills-marketplace.test.ts` holds them equal).
+A clone of this repository already has the skills. To use them from another directory, such as a talk's own repository, install the plugin from this repository's marketplace, `infinity-cube`. Both products install at user scope, so the skills are available in every project, and cache the plugin by version, so a change reaches installed copies only when the version in all three of `plugins/infinity-cube/plugin.json`, `plugins/infinity-cube/.claude-plugin/plugin.json` and `plugins/infinity-cube/.codex-plugin/plugin.json` is bumped (`test/unit/skills-marketplace.test.ts` holds them equal).
 
 Claude Code:
 
