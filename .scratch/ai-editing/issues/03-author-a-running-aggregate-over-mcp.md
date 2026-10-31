@@ -11,3 +11,7 @@ Open before this is ready: where the MCP endpoint is served and how ChatGPT, whi
 - [ ] A tool call that Space Authoring refuses answers with its refusal code, and changes nothing
 - [ ] An edit made over MCP appears in an open browser on the same run without a reload
 - [ ] The run writes it back to the directory
+
+## Comments
+
+2026-10-31: ADR 0141 (proposed) answers the open questions: the server runs inside `cube run`, Space Authoring is composed outside the browser, and the run pushes a new revision to an open page. It waits on Toby's choice between this, file tools over the directory, and deferring. Once accepted, this ticket splits into: compose Space Authoring where the run can reach it; push a new revision to the page; the MCP server and its tools.
