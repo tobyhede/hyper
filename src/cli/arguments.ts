@@ -20,6 +20,11 @@ export interface CheckCommand {
   readonly directory: string;
 }
 
+export interface McpCommand {
+  readonly verb: 'mcp';
+  readonly directory: string;
+}
+
 export interface RunCommand {
   readonly verb: 'run';
   readonly directory: string;
@@ -29,7 +34,12 @@ export interface RunCommand {
 }
 
 export type InfinityCubeCommand =
-  { readonly verb: 'help' } | InitCommand | RunCommand | CheckCommand | DatabaseCommand;
+  | { readonly verb: 'help' }
+  | InitCommand
+  | RunCommand
+  | CheckCommand
+  | McpCommand
+  | DatabaseCommand;
 
 interface VerbLine {
   readonly synopsis: string;
@@ -48,6 +58,10 @@ const VERB_LINES: readonly VerbLine[] = [
     summary: 'Import an Aggregate directory as run does, serving and writing nothing',
   },
   {
+    synopsis: 'mcp <dir>',
+    summary: "Serve an MCP server over stdio that edits an Aggregate directory's files",
+  },
+  {
     synopsis: 'import <dir> [--store postgres|sqlite] [--dangerous-replace]',
     summary: 'Import an aggregate into a database (default postgres)',
   },
@@ -58,7 +72,7 @@ const VERB_LINES: readonly VerbLine[] = [
   { synopsis: 'help', summary: 'List every verb' },
 ];
 
-export const USAGE = 'Usage: cube <init|run|check|import|export|help> [arguments]\n';
+export const USAGE = 'Usage: cube <init|run|check|mcp|import|export|help> [arguments]\n';
 
 const synopsisWidth = Math.max(...VERB_LINES.map(({ synopsis }) => synopsis.length));
 
@@ -156,7 +170,8 @@ export const parseInfinityCubeArguments = (
     case '--help':
       return rest.length === 0 ? { verb: 'help' } : undefined;
     case 'init':
-    case 'check': {
+    case 'check':
+    case 'mcp': {
       const [directory, ...extra] = rest;
       return isDirectory(directory) && extra.length === 0 ? { verb, directory } : undefined;
     }

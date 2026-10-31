@@ -1,4 +1,6 @@
+import { stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { isMissingFile } from '../aggregate-directory/space-directory';
 import { describeError } from './describe-error';
 import type { UUID } from '@project/core';
 import type { DatabaseTarget } from '../database/database-target';
@@ -25,6 +27,8 @@ export interface InfinityCubeDependencies {
   readonly targets: Readonly<Record<InfinityCubeStore, DatabaseTarget>>;
   /** Serve an Aggregate directory until the author stops it, answering the exit code. */
   readonly launchRun: (command: RunCommand) => Promise<number>;
+  /** Serve the MCP server for an Aggregate directory until its client disconnects, answering the exit code. */
+  readonly serveMcp: (directory: string) => Promise<number>;
 }
 
 const init = async (
@@ -73,10 +77,39 @@ const check = async (
   return 0;
 };
 
+/**
+ * Serve an existing directory, empty or not, since the client may write an
+ * aggregate into it; a missing one is refused, so a mistyped path is not
+ * written as a new talk (ADR 0124).
+ */
+const mcp = async (
+  directory: string,
+  { io, serveMcp }: Pick<InfinityCubeDependencies, 'io' | 'serveMcp'>,
+): Promise<number> => {
+  let isDirectory: boolean;
+  try {
+    isDirectory = (await stat(directory)).isDirectory();
+  } catch (error) {
+    if (isMissingFile(error)) {
+      io.stderr(
+        `${directory} does not exist. To create an aggregate there: pnpm cube init ${shellWord(directory)}\n`,
+      );
+    } else {
+      io.stderr(`Could not serve ${directory}: ${describeError(error)}\n`);
+    }
+    return 1;
+  }
+  if (!isDirectory) {
+    io.stderr(`${directory} is not a directory.\n`);
+    return 1;
+  }
+  return serveMcp(directory);
+};
+
 /** Run one `cube` command line and answer its exit code. A usage error exits 2. */
 export const runInfinityCube = async (
   args: readonly string[],
-  { io, newId, workingDirectory, targets, launchRun }: InfinityCubeDependencies,
+  { io, newId, workingDirectory, targets, launchRun, serveMcp }: InfinityCubeDependencies,
 ): Promise<number> => {
   const command = parseInfinityCubeArguments(args);
   if (command === undefined) {
@@ -93,6 +126,8 @@ export const runInfinityCube = async (
       return init(directory, { io, newId });
     case 'check':
       return check(directory, { io, newId });
+    case 'mcp':
+      return mcp(directory, { io, serveMcp });
     case 'run':
       return launchRun({ ...command, directory });
     case 'import':

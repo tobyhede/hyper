@@ -240,6 +240,7 @@ describe('infinity-cube CLI --store sqlite', () => {
         targets: { sqlite, postgres },
         workingDirectory: '/sqlite-infinity-cube-cli/unreached',
         launchRun: () => Promise.reject(new Error('A run was launched')),
+        serveMcp: () => Promise.reject(new Error('An MCP server was served')),
         io: {
           stdout: (message) => output.push(message),
           stderr: (message) => output.push(message),

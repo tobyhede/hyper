@@ -1,8 +1,8 @@
-# 03: Author a running aggregate over MCP
+# 04: Author a running aggregate over MCP
 
 **What to build:** a chat application with no filesystem (ChatGPT, Claude.ai) edits a talk that `pnpm cube run` is serving, through an MCP server the run offers. Its tools are authoring operations, such as add a Resource, place it on a Map or add an Edge to a Graph, each answered by Space Authoring's completed, unchanged or refused, so the refusal cascade applies to an agent as it does to the canvas. Edits appear in the open browser and are written back to the directory as every run writes them (ADR 0117).
 
-**Blocked by:** None
+**Blocked by:** `03-edit-an-aggregate-directory-over-mcp.md`, and ADR 0141 accepted
 
 **Status:** needs-triage
 
@@ -18,3 +18,5 @@ Open before this is ready: where the MCP endpoint is served and how ChatGPT, whi
 ## Comments
 
 2026-10-31: ADR 0141 (proposed) answers the open questions: the server runs inside `cube run`, Space Authoring is composed outside the browser, and the run pushes a new revision to an open page. It waits on Toby's choice between this, file tools over the directory, and deferring. Once accepted, this ticket splits into: compose Space Authoring where the run can reach it; push a new revision to the page; the MCP server and its tools.
+
+2026-10-31: Toby chose file tools over the directory as ticket 03 and this as ticket 04, after it. It stays needs-triage until ADR 0141 names its credential and is accepted.

@@ -1,6 +1,6 @@
 # The Aggregate directory
 
-An **Aggregate directory** is the on-disk form of everything InfinityCube holds: every Space, rooted at the Meta Space, plus the pictures its Image Resources show. `pnpm cube init <dir>` creates one, `pnpm cube run <dir>` runs one ([ADR 0117](adr/0117-running-serves-an-aggregate-directory-as-the-durable-copy.md)), `pnpm cube check <dir>` reads one as a run would without serving or writing it, and `pnpm cube import` and `pnpm cube export` Import one into a database and Export one back out ([ADR 0124](adr/0124-one-hyper-cli.md)). Exporting writes the same format whichever store it reads from.
+An **Aggregate directory** is the on-disk form of everything InfinityCube holds: every Space, rooted at the Meta Space, plus the pictures its Image Resources show. `pnpm cube init <dir>` creates one, `pnpm cube run <dir>` runs one ([ADR 0117](adr/0117-running-serves-an-aggregate-directory-as-the-durable-copy.md)), `pnpm cube check <dir>` reads one as a run would without serving or writing it, `pnpm cube mcp <dir>` serves a local MCP server that edits one's files, and `pnpm cube import` and `pnpm cube export` Import one into a database and Export one back out ([ADR 0124](adr/0124-one-hyper-cli.md)). Exporting writes the same format whichever store it reads from.
 
 The directory is plain files meant for git: JSON in a fixed key order, one JSON Resource file per Resource with a Markdown Resource's source beside it, and pictures named by their content. Exporting the same content twice writes the same bytes, so a diff shows only what changed.
 
@@ -196,6 +196,25 @@ Two layers:
 - **References.** `@project/graph` checks that every Edge, placement, `activeGraph`, `defaultMap` and Reference Resource `target` resolves inside its Space, that there are no duplicate Ids or duplicate Edges, and then the aggregate rules above across Spaces.
 
 `pnpm cube check`, `pnpm cube run` and `pnpm cube import` print what they refuse and exit non-zero; `check` Imports the directory as `run` does, so it refuses what `run` refuses, and writes nothing; it does not try the writes a run makes after an edit. A file that cannot be read is named by its path; a broken reference is named by its Space and the Ids involved. Reading comes before the reference checks, so fixing the first round of problems can reveal a second.
+
+## Editing over MCP
+
+`pnpm cube mcp <dir>` serves a local [MCP](https://modelcontextprotocol.io) server over standard input and output, for a client that calls MCP tools but has no shell or filesystem of its own. Its tools are `list_files`, `read_file`, `write_file` and `delete_file` over the files of `<dir>`, and `check`, which answers what `pnpm cube check` prints. A path is relative to `<dir>`; one that leaves it, names a dot-entry such as `.git`, or reaches outside it through a symbolic link is refused. `write_file` replaces a file by renaming a written temporary file over it. A missing `<dir>` is refused, naming `pnpm cube init`; an empty one is served, so a client can write a new aggregate into it.
+
+Standard output carries the protocol alone, so start it with pnpm's `--silent`, which drops the line pnpm prints before running a script, from the InfinityCube clone and with an absolute `<dir>`. A client whose configuration names a command but no working directory can start it through a shell:
+
+```json
+{
+  "mcpServers": {
+    "infinity-cube": {
+      "command": "sh",
+      "args": ["-c", "cd /path/to/infinity-cube && exec pnpm --silent cube mcp /path/to/talk"]
+    }
+  }
+}
+```
+
+The server edits files, as an author does: a run serving the same directory writes over what it writes, so stop the run first, and a running talk sees the edits only when it is started again.
 
 ## Durable URLs and HTTP resources
 

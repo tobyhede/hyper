@@ -101,6 +101,7 @@ const unreachedTarget: DatabaseTarget = {
 const unlaunched = {
   workingDirectory: '/database-cli-targets/unreached',
   launchRun: () => Promise.reject(new Error('A run was launched')),
+  serveMcp: () => Promise.reject(new Error('An MCP server was served')),
 };
 
 describe.each(cases)('database CLI target ($name)', (targetCase) => {
