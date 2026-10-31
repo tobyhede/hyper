@@ -9,7 +9,7 @@ import { rejectSymbolicLinks, replaceFile } from '../aggregate-directory/write-i
 import { describeCheckFailure, describeError } from '../cli/describe-error';
 import { describeCheck } from '../cli/run-refusal';
 
-const INSTRUCTIONS = `This server edits one InfinityCube Aggregate directory: a talk's Spaces, Maps, Graphs and Resources as JSON and Markdown files, by paths relative to the directory. The format is https://github.com/tobyhede/infinity-cube/blob/main/docs/aggregate-directory.md. Edit only a directory no pnpm cube run is serving, since a run overwrites what you write. Read ${AGGREGATE_FILE_NAME} and each space.json before writing, and call check after: it Imports the directory as a run does and answers what it refuses. Dot-entries and symbolic links are refused.`;
+const INSTRUCTIONS = `This server edits one InfinityCube Aggregate directory: a talk's Spaces, Maps, Graphs and Resources as JSON and Markdown files, by paths relative to the directory. The format is https://github.com/tobyhede/infinity-cube/blob/main/docs/aggregate-directory.md. Edit only a directory no pnpm cube run is serving, since a run overwrites what you write. Call list_files first; read ${AGGREGATE_FILE_NAME} and each space.json it lists before writing, and if it lists none the directory is empty and check says what to write. Call check after writing: it Imports the directory as a run does and answers what it refuses. Dot-entries and symbolic links are refused.`;
 
 const EMPTY = `The directory holds no aggregate yet. Write ${AGGREGATE_FILE_NAME} and its Meta Space's directory as the format reference describes, then check again.`;
 
