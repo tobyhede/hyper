@@ -171,6 +171,48 @@ const createWriter = (
   };
 };
 
+/** Why a directory was not run, or not accepted by a check. */
+export type RunRefusal = Exclude<RunStart, { readonly kind: 'running' }>;
+
+/**
+ * Import the directory into a fresh store, answering why it was refused, or
+ * `undefined` once the store holds its aggregate. A run and a check both read
+ * through here, so they refuse the same directories.
+ */
+const readInto = async (
+  directory: string,
+  repository: MemorySpaceRepository,
+  newId: () => UUID,
+): Promise<RunRefusal | undefined> => {
+  if (await holdsNothing(directory)) return { kind: 'empty' };
+  let imported;
+  try {
+    imported = await importAggregate(directory, repository, { replace: false, newId });
+  } catch (error) {
+    if (!(error instanceof AggregateDirectoryError)) throw error;
+    return { kind: 'unreadable', diagnostics: error.diagnostics };
+  }
+  if (imported.kind === 'aggregate-refused') {
+    return {
+      kind: 'aggregate-refused',
+      diagnostics: describeAggregateRefusal(imported.errors, imported.spaces),
+    };
+  }
+  if (imported.kind !== 'imported') {
+    throw new Error(`A fresh store answered ${imported.kind} to Importing ${directory}`);
+  }
+  return undefined;
+};
+
+export type CheckResult = { readonly kind: 'valid' } | RunRefusal;
+
+/**
+ * Read an Aggregate directory as a run would, into a store that is then
+ * discarded, so nothing is served and nothing is written.
+ */
+export const checkAggregate = async (directory: string, newId: () => UUID): Promise<CheckResult> =>
+  (await readInto(directory, new MemorySpaceRepository(), newId)) ?? { kind: 'valid' };
+
 /**
  * Run an Aggregate directory (ADR 0117): Import it into a fresh memory store,
  * refusing a missing or empty one, then write every committed edit back once
@@ -204,26 +246,8 @@ export const startRun = async (directory: string, options: RunOptions): Promise<
     if (event.kind === 'write-failed' && serving) scheduleWrite();
   });
 
-  if (await holdsNothing(directory)) return { kind: 'empty' };
-  let imported;
-  try {
-    imported = await importAggregate(directory, repository, {
-      replace: false,
-      newId: options.newId,
-    });
-  } catch (error) {
-    if (!(error instanceof AggregateDirectoryError)) throw error;
-    return { kind: 'unreadable', diagnostics: error.diagnostics };
-  }
-  if (imported.kind === 'aggregate-refused') {
-    return {
-      kind: 'aggregate-refused',
-      diagnostics: describeAggregateRefusal(imported.errors, imported.spaces),
-    };
-  }
-  if (imported.kind !== 'imported') {
-    throw new Error(`A fresh store answered ${imported.kind} to Importing ${directory}`);
-  }
+  const refusal = await readInto(directory, repository, options.newId);
+  if (refusal !== undefined) return refusal;
 
   serving = true;
   const run: Run = {

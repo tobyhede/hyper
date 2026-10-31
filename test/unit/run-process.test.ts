@@ -2,7 +2,7 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import type { RunCommand } from '../../src/cli/arguments';
 import { decodeRunCommand, encodeRunCommand } from '../../src/cli/run-launcher';
-import { describeRunRefusal } from '../../src/cli/run-process';
+import { describeRunRefusal } from '../../src/cli/run-refusal';
 
 describe('a run refusal', () => {
   it('names init, with the directory as one shell word, for a missing or empty directory', () => {

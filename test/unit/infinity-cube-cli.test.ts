@@ -1,17 +1,7 @@
-import {
-  access,
-  lstat,
-  mkdtemp,
-  mkdir,
-  readdir,
-  readFile,
-  rm,
-  symlink,
-  writeFile,
-} from 'node:fs/promises';
+import { access, lstat, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join, relative } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { newUuid, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import type { LoadedSpace } from '@project/persistence';
@@ -20,16 +10,22 @@ import { runDatabaseCli } from '../../src/cli/database-entry';
 import type { DatabaseCommand, RunCommand } from '../../src/cli/arguments';
 import type { CliIo } from '../../src/cli/io';
 import { runInfinityCube } from '../../src/cli/run';
+import { describeRunRefusal } from '../../src/cli/run-refusal';
+import { startRun } from '../../src/run/run';
 import type { DatabaseTarget } from '../../src/database/database-target';
 import { type SpaceRepository, AGGREGATE_FILE_NAME } from '@project/aggregate';
 import { readSingleSpace } from '../../src/aggregate-directory';
 import {
+  filesUnder,
   markdownResourceFiles,
   writeAggregateInto,
   type SpaceDirectory,
 } from '../support/aggregate-directory';
 import { MemorySpaceRepository } from '@project/aggregate';
 import { runCommand } from '../support/infinity-cube-command';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { callTool } from '../support/mcp-tool-answer';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const RESOURCE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
@@ -50,7 +46,7 @@ const STORED_RESOURCE_FILE = `${JSON.stringify(
   2,
 )}\n`;
 
-const USAGE = 'Usage: cube <init|run|import|export|help> [arguments]\n';
+const USAGE = 'Usage: cube <init|run|check|mcp|import|export|help> [arguments]\n';
 
 const storedSpace: LoadedSpace = {
   snapshot: {
@@ -143,6 +139,7 @@ const unreachedTarget = (store: string): DatabaseTarget => ({
 const unlaunched = {
   workingDirectory: '/infinity-cube-cli-unit/unreached',
   launchRun: () => Promise.reject(new Error('A run was launched')),
+  serveMcp: () => Promise.reject(new Error('An MCP server was served')),
 };
 
 /** Run a command line whose default store, PostgreSQL, is the held repository. */
@@ -690,6 +687,16 @@ describe('runInfinityCube', () => {
     { args: ['init', 'talk', '--no-open'] },
     { args: ['init', 'talk', '--store', 'postgres'] },
     { args: ['init', 'talk', '--store', 'sqlite'] },
+    { args: ['check'] },
+    { args: ['check', ''] },
+    { args: ['check', 'first', 'second'] },
+    { args: ['check', 'talk', '--no-open'] },
+    { args: ['check', 'talk', '--store', 'sqlite'] },
+    { args: ['mcp'] },
+    { args: ['mcp', ''] },
+    { args: ['mcp', 'first', 'second'] },
+    { args: ['mcp', 'talk', '--no-open'] },
+    { args: ['mcp', 'talk', '--store', 'sqlite'] },
     { args: ['run'] },
     { args: ['run', ''] },
     { args: ['run', 'first', 'second'] },
@@ -1060,6 +1067,8 @@ describe('runInfinityCube', () => {
       expect(verbLines.map((line) => line.split(/\s+/)[2])).toEqual([
         'init',
         'run',
+        'check',
+        'mcp',
         'import',
         'export',
         'help',
@@ -1144,8 +1153,8 @@ describe('runInfinityCube', () => {
         io: output.io,
         newId: newUuid,
         targets: { postgres: heldTarget(repository), sqlite: unreachedTarget('sqlite') },
+        ...unlaunched,
         workingDirectory,
-        launchRun: unlaunched.launchRun,
       });
 
     expect(await over(['import', basename(directory)])).toBe(0);
@@ -1334,20 +1343,10 @@ describe('runInfinityCube author verbs', () => {
     sqlite: unreachedTarget('sqlite'),
   };
 
-  /** Every file under `directory`, by relative path, with its contents. */
-  const filesUnder = async (directory: string): Promise<Record<string, string>> => {
-    const entries = await readdir(directory, { recursive: true, withFileTypes: true });
-    const files: Record<string, string> = {};
-    for (const entry of entries.filter((candidate) => candidate.isFile())) {
-      const path = join(entry.parentPath, entry.name);
-      files[relative(directory, path)] = await readFile(path, 'base64');
-    }
-    return files;
-  };
-
   const author = (args: readonly string[], workingDirectory: string) => {
     const output = captureIo();
     const launched: RunCommand[] = [];
+    const served: string[] = [];
     const exitCode = runInfinityCube(args, {
       io: output.io,
       newId: newUuid,
@@ -1357,8 +1356,12 @@ describe('runInfinityCube author verbs', () => {
         launched.push(command);
         return Promise.resolve(7);
       },
+      serveMcp: (directory) => {
+        served.push(directory);
+        return Promise.resolve(5);
+      },
     });
-    return { output, launched, exitCode };
+    return { output, launched, served, exitCode };
   };
 
   it.each([
@@ -1405,6 +1408,124 @@ describe('runInfinityCube author verbs', () => {
     expect(await filesUnder(directory)).toEqual(before);
   });
 
+  it('check accepts a valid aggregate, writing nothing and launching no run', async () => {
+    const directory = await writeSingleSpaceAggregate();
+    const before = await filesUnder(directory);
+
+    const { output, launched, exitCode } = author(['check', directory], '/authors/home');
+
+    expect(await exitCode).toBe(0);
+    expect(output.stderr).toEqual([]);
+    expect(output.stdout).toEqual([`${directory} is a valid aggregate.\n`]);
+    expect(launched).toEqual([]);
+    expect(await filesUnder(directory)).toEqual(before);
+  });
+
+  it('check accepts a hand-written aggregate that omits Map and Graph ids without writing them', async () => {
+    const directory = await writeAggregate(SPACE_ID, [
+      {
+        name: SPACE_ID,
+        spaceFile: JSON.stringify({
+          version: 1,
+          title: 'Hand-written',
+          maps: [
+            {
+              title: 'Only map',
+              kind: 'positioned',
+              positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
+              graphs: [{ title: 'Only graph', edges: [] }],
+            },
+          ],
+        }),
+        resources: markdownResourceFiles(RESOURCE_ID, 'Opening', 'Hello.\n'),
+      },
+    ]);
+    const before = await filesUnder(directory);
+
+    const { output, exitCode } = author(['check', directory], '/authors/home');
+
+    expect(output.stderr).toEqual([]);
+    expect(await exitCode).toBe(0);
+    expect(await filesUnder(directory)).toEqual(before);
+  });
+
+  it('check refuses what a run refuses, printing the same problems', async () => {
+    const directory = await writeAggregate(SPACE_ID, [
+      {
+        name: SPACE_ID,
+        spaceFile: JSON.stringify({
+          version: 1,
+          id: SPACE_ID,
+          title: 'Dangling',
+          maps: [
+            {
+              id: OTHER_SPACE_ID,
+              title: 'Only map',
+              kind: 'positioned',
+              positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
+              graphs: [{ id: GRAPH_ID, title: 'Only graph', edges: [] }],
+            },
+          ],
+        }),
+        resources: markdownResourceFiles(OPENING_ID, 'Opening', 'Hello.\n'),
+      },
+    ]);
+    const before = await filesUnder(directory);
+    const started = await startRun(directory, {
+      newId: newUuid,
+      schedule: () => () => undefined,
+      report: () => undefined,
+    });
+    if (started.kind === 'running') {
+      await started.run.stop();
+      throw new Error('A run accepted a dangling placement');
+    }
+
+    const { output, exitCode } = author(['check', directory], '/authors/home');
+
+    expect(await exitCode).toBe(1);
+    expect(output.stdout).toEqual([]);
+    expect(output.stderr).toEqual([describeRunRefusal(started, directory)]);
+    expect(output.stderr.join('')).toContain(RESOURCE_ID);
+    expect(await filesUnder(directory)).toEqual(before);
+  });
+
+  it('check refuses a directory that is not an Aggregate directory, naming the file', async () => {
+    const directory = await writeSingleSpaceAggregate();
+    await writeFile(join(directory, AGGREGATE_FILE_NAME), 'not json\n');
+
+    const { output, exitCode } = author(['check', directory], '/authors/home');
+
+    expect(await exitCode).toBe(1);
+    expect(output.stdout).toEqual([]);
+    const reported = output.stderr.join('');
+    expect(reported).toContain(`${directory} is not an Aggregate directory:`);
+    expect(reported).toContain(AGGREGATE_FILE_NAME);
+  });
+
+  it.each([
+    { holding: 'nothing, being missing', make: () => Promise.resolve() },
+    {
+      holding: 'only dot-entries',
+      make: (directory: string) => mkdir(join(directory, '.git'), { recursive: true }),
+    },
+  ])(
+    'check refuses a directory holding $holding, naming init, relative to the working directory',
+    async ({ make }) => {
+      const workingDirectory = await makeTemporaryDirectory();
+      const directory = join(workingDirectory, 'rust asycn');
+      await make(directory);
+
+      const { output, exitCode } = author(['check', 'rust asycn'], workingDirectory);
+
+      expect(await exitCode).toBe(1);
+      expect(output.stdout).toEqual([]);
+      expect(output.stderr).toEqual([
+        `${directory} holds no aggregate: it is missing or empty. To create one there: pnpm cube init '${directory}'\n`,
+      ]);
+    },
+  );
+
   it.each([
     {
       args: ['run', 'talk'],
@@ -1425,6 +1546,57 @@ describe('runInfinityCube author verbs', () => {
       expect(output.stderr).toEqual([]);
     },
   );
+
+  it.each([
+    {
+      holding: 'an aggregate',
+      make: (directory: string) => writeAggregateInto(directory, SPACE_ID, []),
+    },
+    { holding: 'nothing, being empty', make: () => Promise.resolve() },
+  ])(
+    'mcp serves a directory holding $holding, resolved against the working directory, answering the server’s exit code',
+    async ({ make }) => {
+      const workingDirectory = await makeTemporaryDirectory();
+      const directory = join(workingDirectory, 'new talk');
+      await mkdir(directory);
+      await make(directory);
+
+      const { output, launched, served, exitCode } = author(['mcp', 'new talk'], workingDirectory);
+
+      expect(await exitCode).toBe(5);
+      expect(served).toEqual([directory]);
+      expect(launched).toEqual([]);
+      expect(output.stdout).toEqual([]);
+      expect(output.stderr).toEqual([]);
+    },
+  );
+
+  it('mcp refuses a missing directory, naming init, serving nothing', async () => {
+    const workingDirectory = await makeTemporaryDirectory();
+    const directory = join(workingDirectory, 'rust asycn');
+
+    const { output, served, exitCode } = author(['mcp', 'rust asycn'], workingDirectory);
+
+    expect(await exitCode).toBe(1);
+    expect(served).toEqual([]);
+    expect(output.stdout).toEqual([]);
+    expect(output.stderr).toEqual([
+      `${directory} does not exist. To create an aggregate there: pnpm cube init '${directory}'\n`,
+    ]);
+  });
+
+  it('mcp refuses a path that is a file, serving nothing', async () => {
+    const workingDirectory = await makeTemporaryDirectory();
+    const file = join(workingDirectory, 'talk.json');
+    await writeFile(file, '{}\n');
+
+    const { output, served, exitCode } = author(['mcp', file], workingDirectory);
+
+    expect(await exitCode).toBe(1);
+    expect(served).toEqual([]);
+    expect(output.stdout).toEqual([]);
+    expect(output.stderr).toEqual([`${file} is not a directory.\n`]);
+  });
 });
 
 describe('the cube entry point', () => {
@@ -1480,4 +1652,36 @@ describe('the cube entry point', () => {
     },
     20_000,
   );
+
+  it('serves mcp over standard input and output, writing nothing else to standard output', async () => {
+    const directory = await writeSingleSpaceAggregate();
+    const transport = new StdioClientTransport({
+      command: process.execPath,
+      args: [
+        tsxCli,
+        '--tsconfig',
+        join(repositoryRoot, 'tsconfig.json'),
+        join(repositoryRoot, 'src/cli/entry.ts'),
+        'mcp',
+        directory,
+      ],
+      cwd: await makeTemporaryDirectory(),
+      stderr: 'pipe',
+    });
+    const errors: Error[] = [];
+    const client = new Client({ name: 'cube-entry-point-test', version: '0.0.0' });
+    client.onerror = (error) => errors.push(error);
+    await client.connect(transport);
+    try {
+      const listed = await callTool(client, 'list_files');
+      const checked = await callTool(client, 'check');
+
+      expect(listed.isError).toBe(false);
+      expect(listed.text.split('\n')).toContain(AGGREGATE_FILE_NAME);
+      expect(checked).toEqual({ text: `${directory} is a valid aggregate.\n`, isError: false });
+      expect(errors).toEqual([]);
+    } finally {
+      await client.close();
+    }
+  }, 20_000);
 });

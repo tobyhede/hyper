@@ -1,11 +1,10 @@
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { describeAggregateReadRefusal } from '@project/aggregate';
-import type { RunEvent, RunStart } from '../run/run';
+import type { RunEvent } from '../run/run';
 import type { RunCommand } from './arguments';
 import { describeError } from './describe-error';
 import { RUN_HANDLING_SIGNALS, RUN_SIGNALS, decodeRunCommand } from './run-launcher';
-import { shellWord } from './shell-word';
+import { describeRunRefusal } from './run-refusal';
 
 /**
  * The process behind `cube run <dir>` that runs an Aggregate directory
@@ -19,20 +18,6 @@ import { shellWord } from './shell-word';
  */
 
 const DEFAULT_PORT = 4173;
-
-/** Why a run did not start, as the sentence the author reads. */
-export const describeRunRefusal = (
-  refusal: Exclude<RunStart, { readonly kind: 'running' }>,
-  directory: string,
-): string => {
-  switch (refusal.kind) {
-    case 'empty':
-      return `${directory} holds no aggregate: it is missing or empty. To create one there: pnpm cube init ${shellWord(directory)}\n`;
-    case 'unreadable':
-    case 'aggregate-refused':
-      return `${describeAggregateReadRefusal(refusal, directory)}\n`;
-  }
-};
 
 const report = (event: RunEvent): void => {
   if (event.kind === 'write-failed') {

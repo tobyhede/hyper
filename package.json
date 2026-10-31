@@ -109,8 +109,10 @@
     "wrangler": "4.147.0"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
     "@prisma-next/postgres": "0.16.0",
     "@prisma-next/sqlite": "0.16.0",
-    "dotenv": "^17.4.2"
+    "dotenv": "^17.4.2",
+    "zod": "^3.25.76"
   }
 }

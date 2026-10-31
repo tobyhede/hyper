@@ -9,11 +9,12 @@ import { isMissingFile } from './space-directory';
  */
 export type DirectoryFiles = ReadonlyMap<string, Uint8Array>;
 
-const rejectSymbolicLink = async (path: string): Promise<void> => {
+const exportRefusal = (path: string): Error =>
+  new Error(`Export destination contains a symbolic link: ${path}`);
+
+const rejectSymbolicLink = async (path: string, refuse: (path: string) => Error): Promise<void> => {
   try {
-    if ((await lstat(path)).isSymbolicLink()) {
-      throw new Error(`Export destination contains a symbolic link: ${path}`);
-    }
+    if ((await lstat(path)).isSymbolicLink()) throw refuse(path);
   } catch (error) {
     if (isMissingFile(error)) return;
     throw error;
@@ -23,11 +24,13 @@ const rejectSymbolicLink = async (path: string): Promise<void> => {
 /**
  * Refuse to write through a symbolic link: the directory itself, any file it
  * should hold, or any directory between the two. Writing through one would
- * change files outside the directory, which nothing here owns.
+ * change files outside the directory, which nothing here owns. `refuse` names
+ * the link found; by default it is Export's refusal.
  */
 export const rejectSymbolicLinks = async (
   directory: string,
   paths: Iterable<string>,
+  refuse: (path: string) => Error = exportRefusal,
 ): Promise<void> => {
   const checked = new Set<string>([directory]);
   for (const path of paths) {
@@ -37,7 +40,7 @@ export const rejectSymbolicLinks = async (
       current = dirname(current);
     }
   }
-  for (const path of checked) await rejectSymbolicLink(path);
+  for (const path of checked) await rejectSymbolicLink(path, refuse);
 };
 
 const holdsBytes = async (path: string, bytes: Uint8Array): Promise<boolean> => {
@@ -75,7 +78,7 @@ const createTemporaryFile = async (
  * it half-written. On failure only the temporary file this call created is
  * removed.
  */
-const replaceFile = async (path: string, bytes: Uint8Array): Promise<void> => {
+export const replaceFile = async (path: string, bytes: Uint8Array): Promise<void> => {
   const { temporary, handle } = await createTemporaryFile(path);
   try {
     try {
