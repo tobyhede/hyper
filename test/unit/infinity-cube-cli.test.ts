@@ -20,7 +20,7 @@ import { runDatabaseCli } from '../../src/cli/database-entry';
 import type { DatabaseCommand, RunCommand } from '../../src/cli/arguments';
 import type { CliIo } from '../../src/cli/io';
 import { runInfinityCube } from '../../src/cli/run';
-import { describeRunRefusal } from '../../src/cli/run-process';
+import { describeRunRefusal } from '../../src/cli/run-refusal';
 import { startRun } from '../../src/run/run';
 import type { DatabaseTarget } from '../../src/database/database-target';
 import { type SpaceRepository, AGGREGATE_FILE_NAME } from '@project/aggregate';
@@ -1481,7 +1481,10 @@ describe('runInfinityCube author verbs', () => {
       schedule: () => () => undefined,
       report: () => undefined,
     });
-    if (started.kind === 'running') throw new Error('A run accepted a dangling placement');
+    if (started.kind === 'running') {
+      await started.run.stop();
+      throw new Error('A run accepted a dangling placement');
+    }
 
     const { output, exitCode } = author(['check', directory], '/authors/home');
 
@@ -1490,6 +1493,19 @@ describe('runInfinityCube author verbs', () => {
     expect(output.stderr).toEqual([describeRunRefusal(started, directory)]);
     expect(output.stderr.join('')).toContain(RESOURCE_ID);
     expect(await filesUnder(directory)).toEqual(before);
+  });
+
+  it('check refuses a directory that is not an Aggregate directory, naming the file', async () => {
+    const directory = await writeSingleSpaceAggregate();
+    await writeFile(join(directory, AGGREGATE_FILE_NAME), 'not json\n');
+
+    const { output, exitCode } = author(['check', directory], '/authors/home');
+
+    expect(await exitCode).toBe(1);
+    expect(output.stdout).toEqual([]);
+    const reported = output.stderr.join('');
+    expect(reported).toContain(`${directory} is not an Aggregate directory:`);
+    expect(reported).toContain(AGGREGATE_FILE_NAME);
   });
 
   it.each([

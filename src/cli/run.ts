@@ -52,17 +52,21 @@ const check = async (
   directory: string,
   { io, newId }: Pick<InfinityCubeDependencies, 'io' | 'newId'>,
 ): Promise<number> => {
-  let result;
+  /** What the author reads when the directory is refused; `undefined` when it is accepted. */
+  let refusal: string | undefined;
   try {
     const { checkAggregate } = await import('../run/run');
-    result = await checkAggregate(directory, newId);
+    const result = await checkAggregate(directory, newId);
+    if (result.kind !== 'valid') {
+      const { describeRunRefusal } = await import('./run-refusal');
+      refusal = describeRunRefusal(result, directory);
+    }
   } catch (error) {
     io.stderr(`Could not check ${directory}: ${describeError(error)}\n`);
     return 1;
   }
-  if (result.kind !== 'valid') {
-    const { describeRunRefusal } = await import('./run-process');
-    io.stderr(describeRunRefusal(result, directory));
+  if (refusal !== undefined) {
+    io.stderr(refusal);
     return 1;
   }
   io.stdout(`${directory} is a valid aggregate.\n`);

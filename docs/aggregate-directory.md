@@ -195,7 +195,7 @@ Two layers:
 - **Shape.** Zod schemas in `@project/core` check `aggregate.json`, each `space.json` and each Resource file. The same shapes are published as JSON Schema in [`docs/schema/`](schema/README.md).
 - **References.** `@project/graph` checks that every Edge, placement, `activeGraph`, `defaultMap` and Reference Resource `target` resolves inside its Space, that there are no duplicate Ids or duplicate Edges, and then the aggregate rules above across Spaces.
 
-`pnpm cube check`, `pnpm cube run` and `pnpm cube import` print what they refuse and exit non-zero; `check` reads the directory exactly as `run` does, and writes nothing. A file that cannot be read is named by its path; a broken reference is named by its Space and the Ids involved. Reading comes before the reference checks, so fixing the first round of problems can reveal a second.
+`pnpm cube check`, `pnpm cube run` and `pnpm cube import` print what they refuse and exit non-zero; `check` Imports the directory as `run` does, so it refuses what `run` refuses, and writes nothing; it does not try the writes a run makes after an edit. A file that cannot be read is named by its path; a broken reference is named by its Space and the Ids involved. Reading comes before the reference checks, so fixing the first round of problems can reveal a second.
 
 ## Durable URLs and HTTP resources
 

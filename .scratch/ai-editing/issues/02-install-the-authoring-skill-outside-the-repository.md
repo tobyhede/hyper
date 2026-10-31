@@ -12,4 +12,4 @@
 
 ## Comments
 
-The skill's directory is the package: it holds only `SKILL.md`, which now links by absolute URL, so copying or zipping the directory installs it and there is no build step to keep in step. A test in `agent-skill-commands.test.ts` refuses a link that is not `https://`.
+The skill's directory is the package: it holds only `SKILL.md`, which now links by absolute URL, so copying or zipping the directory installs it and there is no build step to keep in step. A test in `agent-skill-commands.test.ts` refuses a link that is not `https://` in any of the skill's instruction files, so a second file added later is held too. The skill tells the agent to read the reference in the clone it checks with, so the reference and the intake are the same version.

@@ -45,7 +45,7 @@ const VERB_LINES: readonly VerbLine[] = [
   },
   {
     synopsis: 'check <dir>',
-    summary: 'Read an Aggregate directory as run would, serving and writing nothing',
+    summary: 'Import an Aggregate directory as run does, serving and writing nothing',
   },
   {
     synopsis: 'import <dir> [--store postgres|sqlite] [--dangerous-replace]',

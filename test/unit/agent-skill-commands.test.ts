@@ -94,13 +94,14 @@ describe('commands in the InfinityCube getting-started and authoring skills', ()
 // `infinity-cube-authoring` is installed outside this repository too (Claude.ai,
 // a content repository, Codex), where a repository-relative link leads nowhere.
 describe('links in the infinity-cube-authoring skill', () => {
-  it('reach the reference from outside the repository', () => {
-    const targets = [...readSkill('infinity-cube-authoring').matchAll(/\]\(([^)]+)\)/g)].map(
-      (match) => match[1] ?? '',
-    );
+  const directory = new URL('../../.agents/skills/infinity-cube-authoring/', import.meta.url);
+  const targets = skillInstructionFiles(directory).flatMap((file) =>
+    [...readFileSync(file, 'utf8').matchAll(/\]\(([^)]+)\)/g)].map((match) => match[1] ?? ''),
+  );
 
+  it('reach the reference from outside the repository', () => {
     expect(targets).toContain(
-      'https://github.com/tobyhede/hyper/blob/main/docs/aggregate-directory.md',
+      'https://github.com/tobyhede/infinity-cube/blob/main/docs/aggregate-directory.md',
     );
     expect(targets.filter((target) => !target.startsWith('https://'))).toEqual([]);
   });
