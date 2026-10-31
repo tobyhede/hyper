@@ -1,6 +1,6 @@
 # Letting AI tools edit Spaces and Maps
 
-Status: ready-for-agent
+Status: in-progress
 
 Toby asked (2026-10-30) how tools such as ChatGPT and Claude should edit Spaces and Maps: an MCP server, skills, or the source files.
 
