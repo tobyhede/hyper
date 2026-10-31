@@ -7,7 +7,7 @@ const readJson = <T>(path: string, schema: z.ZodType<T>): T =>
 
 const identity = z.object({ name: z.literal('infinity-cube'), version: z.string() });
 
-const codexManifest = identity.extend({ skills: z.string() });
+const codexPlugin = identity.extend({ skills: z.string() });
 
 const catalog = <Source extends z.ZodType>(source: Source) =>
   z.object({
@@ -27,9 +27,9 @@ describe('the infinity-cube plugin manifests', () => {
   });
 
   it('points Codex at the skills directory', () => {
-    expect(
-      readJson('plugins/infinity-cube/.codex-plugin/plugin.json', codexManifest),
-    ).toMatchObject({ skills: './skills/' });
+    expect(readJson('plugins/infinity-cube/.codex-plugin/plugin.json', codexPlugin)).toMatchObject({
+      skills: './skills/',
+    });
   });
 });
 
