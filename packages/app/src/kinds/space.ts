@@ -6,9 +6,11 @@ import {
   type SpaceView,
   type UUID,
 } from '@project/core';
+import { createElement, type ReactNode } from 'react';
 import type { ResourceFlowNodeOf } from '@project/react-flow-adapter';
 import type { KindOperationsByKind } from '@project/ui';
 import { buildSpaceResourceRail } from '../build-space-resource-rail';
+import { PresentedSpaceMap } from '../components/PresentedSpaceMap';
 import type {
   CanvasResourceDecorationContext,
   KindCanvasDecoration,
@@ -169,3 +171,11 @@ export const spaceCreation: KindCreation<SpaceCreationContext> = {
   withheld: ({ creatingSpaceResource }) => creatingSpaceResource,
   create: ({ createSpaceResource }) => createSpaceResource(),
 };
+
+/**
+ * What the Stage draws for a Space Resource's content: the Map and Graph it
+ * selects, which only the application can draw, because it needs the Space
+ * the content points at.
+ */
+export const spacePresentation = ({ view }: { readonly view: SpaceView }): ReactNode =>
+  createElement(PresentedSpaceMap, { spaceId: view.spaceId, mapId: view.map, graphId: view.graph });

@@ -74,6 +74,30 @@
   overflow: hidden;
 }
 
+/* What the application draws in place of a kind's content — a Space Resource's
+   Map — fills the room below the name, as a picture does. */
+.stage__body .resource--drawn {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.stage__body .resource--full.resource--drawn {
+  padding: 2.5cqw 3cqw;
+}
+
+/* A smaller name, so the drawing below it has the room. */
+.stage__body .resource--drawn .resource__title {
+  margin-bottom: 1cqw;
+  font-size: 3.6cqw;
+}
+
+.stage__body .resource--drawn > :last-child {
+  flex: 1;
+  min-height: 0;
+}
+
 .stage__body .resource__body > * {
   margin: 0 0 2cqw;
 }
@@ -86,6 +110,16 @@
 
 .stage__body .resource__body :is(ul, ol) {
   padding-left: 4cqw;
+}
+
+/* Tailwind's preflight takes every list's markers away; a slide's lists keep
+   theirs, as the canvas's do (markdown-resource-body.css). */
+.stage__body .resource__body ul {
+  list-style: disc;
+}
+
+.stage__body .resource__body ol {
+  list-style: decimal;
 }
 
 .stage__body .resource__body :is(code, pre) {

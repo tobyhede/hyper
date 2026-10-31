@@ -112,10 +112,34 @@ describe('PresentedResource', () => {
   });
 
   /**
-   * What presenting a Space Resource should draw is `resource-content/07`'s
-   * open question; until it is settled a presented Space Resource draws its
-   * name and nothing below it, rather than an empty document.
+   * A Space Resource's Map needs the Space it points at, which only the
+   * application can hold, so the application hands the drawing in and it
+   * takes the place of the content's own view (ADR 0123).
    */
+  it('draws what the application hands it in place of the content’s own view', () => {
+    const { container } = render(
+      <PresentedResource
+        title="Roadmap"
+        content={{
+          kind: 'space',
+          view: {
+            spaceId: uuidSchema.parse('00000000-0000-4000-8000-000000000001'),
+            map: uuidSchema.parse('00000000-0000-4000-8000-000000000002'),
+            graph: uuidSchema.parse('00000000-0000-4000-8000-000000000003'),
+            framing: undefined,
+          },
+          via: 'self',
+        }}
+      >
+        <div data-testid="drawn-map" />
+      </PresentedResource>,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Roadmap' })).toBeInTheDocument();
+    expect(screen.getByTestId('drawn-map')).toBeInTheDocument();
+    expect(container.querySelector('.resource--drawn')).not.toBeNull();
+  });
+
   it('presents a Space Resource as its name alone', () => {
     const { container } = render(
       <PresentedResource

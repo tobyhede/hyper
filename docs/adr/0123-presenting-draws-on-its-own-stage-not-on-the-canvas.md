@@ -3,7 +3,7 @@
 Status: accepted
 Supersedes: 0027, 0044
 Refines: 0024
-Refined by: 0129
+Refined by: 0129, 0140
 Related: 0043, 0064, 0070, 0106, 0113, 0121, 0122
 
 Presenting draws the Active Resource's content on a **Stage**: a surface of its own, separate from the canvas, that fills the window. The canvas stays mounted behind it and is inert while presenting. Nothing on it is reachable, focusable or drawn to the audience. Traversal is unchanged (ADR 0024): the Stage shows one Resource at a time, and the presenting chrome moves along the Active Graph's Edges.

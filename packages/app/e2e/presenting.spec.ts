@@ -292,8 +292,11 @@ test('a Reference Resource shows its own name over its Target’s content', asyn
   await expect(presentedResource(page).locator('strong')).toHaveText('A');
 });
 
-/** A Space Resource draws its name alone on the Stage, and no Map. */
-test('a Space Resource shows its name only', async ({ page }) => {
+/**
+ * A Space Resource draws the Map it selects on the Stage, whole and taking no
+ * pointer, so a talk can present a diagram kept in a Space of its own.
+ */
+test('a Space Resource shows the Map it selects', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.react-flow__node').first()).toBeVisible();
   await selectCanvas(page, 'Linked Spaces');
@@ -302,11 +305,17 @@ test('a Space Resource shows its name only', async ({ page }) => {
   await presentControl(page).click();
   await expect(presentedName(page)).toHaveText('Presentation');
   await expect(presentedResource(page)).toHaveAttribute('data-content-kind', 'space');
-  await expect(presentedResource(page).locator('.resource__body')).toHaveCount(0);
-  await expect(stage(page).locator('.react-flow')).toHaveCount(0);
+  const drawing = presentedResource(page).getByTestId('presented-map');
+  for (const name of ['Opening remarks', 'The problem', 'Closing'])
+    await expect(drawing.locator('.react-flow__node', { hasText: name })).toBeVisible();
+  await expect(drawing.locator('.react-flow__edge').first()).toBeAttached();
+  await expect(drawing).toHaveCSS('pointer-events', 'none');
+  await expect(drawing).toHaveAttribute('role', 'img');
+  await expect(drawing).toHaveAttribute('aria-description', /Opening remarks/);
 
   await page.keyboard.press('ArrowRight');
   await expect(presentedName(page)).toHaveText('Deep dive');
+  await expect(presentedResource(page).getByTestId('presented-map')).toBeVisible();
 });
 
 /**
@@ -323,6 +332,12 @@ test(
     for (const _ of [0, 1, 2]) await page.keyboard.press('ArrowRight');
     await expect(presentedName(page)).toHaveText('D');
     await expect(presentedResource(page).locator('hr')).toHaveCount(1);
+    // A list keeps its markers on the Stage: the reset that strips them is
+    // undone for presented content.
+    await expect(presentedResource(page).locator('ul').first()).toHaveCSS(
+      'list-style-type',
+      'disc',
+    );
 
     const body = stageBody(page);
     const scrollTop = () => body.evaluate((element) => element.scrollTop);

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   imageKind,
   KIND_IDS,
@@ -6,7 +6,9 @@ import {
   referenceKind,
   spaceKind,
   urKind,
+  UNRESOLVED_CONTENT,
   type KindId,
+  type ResourceContent,
 } from '@project/core';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import {
@@ -18,7 +20,12 @@ import {
 import type { KindCreation } from '../kind-creation';
 import { imageCreation, imageDecoration, type ImageCreationContext } from './image';
 import { markdownCreation, markdownDecoration, type MarkdownCreationContext } from './markdown';
-import { spaceCreation, spaceDecoration, type SpaceCreationContext } from './space';
+import {
+  spaceCreation,
+  spaceDecoration,
+  spacePresentation,
+  type SpaceCreationContext,
+} from './space';
 import { urCreation, urDecoration, type UrCreationContext } from './ur';
 
 /** What every kind's Create reads, together. */
@@ -92,3 +99,34 @@ export function useKindDecoratedNodes(
   const [decorate] = useState(() => kindDecorationMemo(KIND_DECORATORS));
   return decorate(nodes, context);
 }
+
+/** Each kind's content, as the Stage hands it to that kind's presentation. */
+type ContentByKind = { [K in KindId]: Extract<ResourceContent, { readonly kind: K }> };
+
+/**
+ * What the Stage draws in place of a content's own view, for a kind whose
+ * presented content needs the application: a Space Resource's Map, which needs
+ * the Space it points at. `null` for a kind whose presented content is its view
+ * half's alone.
+ */
+type KindPresentations = {
+  readonly [K in KindId]: ((content: ContentByKind[K]) => ReactNode) | null;
+};
+
+const PRESENTATIONS: KindPresentations = {
+  [markdownKind.id]: null,
+  [imageKind.id]: null,
+  [urKind.id]: null,
+  [referenceKind.id]: null,
+  [spaceKind.id]: spacePresentation,
+};
+
+const presentationOf = <K extends KindId>(kind: K, content: ContentByKind[K]): ReactNode =>
+  PRESENTATIONS[kind]?.(content);
+
+/**
+ * What the Stage draws in place of a content's own view, as its kind's app
+ * half draws it, or `undefined` for a kind whose view half draws it alone.
+ */
+export const presentedByApplication = (content: ResourceContent): ReactNode =>
+  content.kind === UNRESOLVED_CONTENT.kind ? undefined : presentationOf(content.kind, content);
