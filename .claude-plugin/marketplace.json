@@ -1,0 +1,14 @@
+{
+  "name": "infinity-cube",
+  "owner": {
+    "name": "InfinityCube contributors"
+  },
+  "description": "Agent skills for running and authoring InfinityCube talks, for Claude Code and Codex.",
+  "plugins": [
+    {
+      "name": "infinity-cube",
+      "source": "./plugins/infinity-cube",
+      "description": "Set up and run InfinityCube, and write an Aggregate directory's files."
+    }
+  ]
+}

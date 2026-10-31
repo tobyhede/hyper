@@ -1,0 +1,10 @@
+{
+  "name": "infinity-cube",
+  "version": "0.1.0",
+  "description": "Set up and run InfinityCube, and write an Aggregate directory's files.",
+  "author": {
+    "name": "InfinityCube contributors"
+  },
+  "homepage": "https://github.com/tobyhede/infinity-cube",
+  "keywords": ["agent-skills", "codex", "claude", "infinity-cube"]
+}

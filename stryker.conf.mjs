@@ -99,7 +99,9 @@ export default {
    * skill paths; `test/unit/agent-skill-symlinks.test.ts` holds the mirror).
    * Copying a directory symlink that way fails on macOS with `ENOTSUP:
    * operation not supported on socket, copyfile`, which kills the run before
-   * any mutant is tested.
+   * any mutant is tested. `.agents/skills/infinity-cube-authoring` and
+   * `.agents/skills/infinity-cube-getting-started` are directory symlinks too,
+   * into the `infinity-cube` plugin under `plugins/`.
    *
    * `.worktrees/**` is load-bearing for a different reason: a git worktree is a
    * full checkout, so without it every branch checked out beside this one is
@@ -110,7 +112,12 @@ export default {
    * `node_modules`, `.git`, `/reports`, `.stryker-tmp` and `/stryker.log` are
    * always ignored by Stryker and do not need listing.
    */
-  ignorePatterns: ['.claude/**', '.worktrees/**'],
+  ignorePatterns: [
+    '.claude/**',
+    '.agents/skills/infinity-cube-authoring',
+    '.agents/skills/infinity-cube-getting-started',
+    '.worktrees/**',
+  ],
 
   /*
    * `'always'`, not the `true` default, which deletes the temp dir only after a

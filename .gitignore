@@ -22,13 +22,16 @@ test-results/
 # ignored skill is missing from every worktree. The four are `shadcn`, vendored
 # and pinned by `skills-lock.json`, and the repo-owned `shadcn-first-ui`,
 # `infinity-cube-authoring` and `infinity-cube-getting-started`. `.agents/skills/` is where
-# Codex looks and holds the real files; `.claude/skills/` is where Claude Code
-# looks and holds symlinks into it — tracking only one fixes only one harness.
+# Codex looks; it holds the first two and symlinks to the other two, whose files
+# are the `infinity-cube` plugin's under `plugins/`. `.claude/skills/` is where
+# Claude Code looks and holds symlinks into `.agents/skills/` — tracking only one
+# fixes only one harness. `.agents/plugins/` is the Codex marketplace catalog.
 # `skills-lock.json` rides along or the vendored copy has no recorded content
 # hash. The parents are `/*` rather than `/` because git will not
 # descend into an excluded directory, so a trailing-slash form cannot be negated.
 .agents/*
 !.agents/skills/
+!.agents/plugins/
 .claude/*
 !.claude/skills/
 # The PreToolUse hook that refuses a Co-Authored-By trailer is shared, and

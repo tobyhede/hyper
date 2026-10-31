@@ -3324,7 +3324,7 @@ describe('the application is named InfinityCube', () => {
     expect(scanned).toContain('README.md');
     expect(scanned).toContain('package.json');
     expect(scanned).toContain('packages/persistence/src/http-protocol.ts');
-    expect(scanned).toContain('.agents/skills/infinity-cube-authoring/SKILL.md');
+    expect(scanned).toContain('plugins/infinity-cube/skills/infinity-cube-authoring/SKILL.md');
     expect(scanned).toContain('compose.yaml');
   });
 
