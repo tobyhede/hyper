@@ -1244,16 +1244,17 @@ test(
 );
 
 /**
- * A mounted session authors as any session does (ADR 0131): the Dock marks
- * that its Edits are lost on reload, and offers every Edit beside what reads.
+ * A mounted session authors as any session does (ADR 0131): the Dock draws no
+ * mark, and offers every Edit beside what reads.
  */
 test(
-  'a mounted session marks its Edits as lost on reload and offers every Edit the Dock offers',
-  { tag: '@parity:command-dock-marks-a-mounted-session-unsaved' },
+  'a mounted session draws no mark in the Dock and offers every Edit the Dock offers',
+  { tag: '@parity:command-dock-offers-a-mounted-session-every-edit' },
   async ({ page }) => {
     await page.goto(story('mounted'));
 
-    await expect(surface(page).getByText('Edits lost on reload', { exact: true })).toBeVisible();
+    await expect(surface(page).getByRole('button', { name: /^Present/ })).toBeVisible();
+    await expect(surface(page).getByText(/reload|page only/i)).toHaveCount(0);
     await expect(page.getByRole('alert')).toHaveCount(0);
 
     for (const create of await surface(page)

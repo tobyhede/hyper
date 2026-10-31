@@ -529,11 +529,18 @@ export const parityClaims: readonly ParityClaim[] = [
       'While an Image Resource’s replacement is held, Open Spaces and the Space, Map and Graph names each report aria-disabled, stay in the Dock’s arrow order and open nothing when pressed.',
   },
   {
-    id: 'command-dock-marks-a-mounted-session-unsaved',
+    id: 'command-dock-offers-a-mounted-session-every-edit',
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Mounted',
     claim:
-      'A mounted session draws a mark in the Dock saying its Edits are lost on reload, and offers rename, Create, Present and the Space, Map and Graph choices as any session does.',
+      'A mounted session draws no mark in the Dock, and offers rename, Create, Present and the Space, Map and Graph choices as any session does.',
+  },
+  {
+    id: 'mounted-edits-notice-reports-where-edits-are-kept',
+    storyFile: 'components/operational-feedback.stories.tsx',
+    storyExport: 'MountedEdits',
+    claim:
+      'A mounted session’s notice says its Edits are kept in this page only and nothing is written to GitHub, as a polite status rather than an alert, and its dismissal puts it away.',
   },
   {
     id: 'command-dock-fits-a-narrow-container',
@@ -951,14 +958,21 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'surfaces/graph-hud.stories.tsx',
     storyExport: 'Retained',
     claim:
-      'The canvas HUD names the current Space and open Map read-only, keys every Graph that Map owns and emphasises the active one, attached above a real MiniMap.',
+      'The canvas HUD keys every Graph the open Map owns and emphasises the active one, attached above a real MiniMap, and names neither the Space nor the Map the Command Dock already names.',
   },
   {
     id: 'graph-hud-key-hands-back-the-pointers-it-does-not-need',
     storyFile: 'surfaces/graph-hud.stories.tsx',
     storyExport: 'Retained',
     claim:
-      'The canvas HUD’s key panel presses nothing, so a pointer over it reaches the canvas beneath rather than being swallowed by the Panel in the corner a Resource’s resize control lives in — while the two clipped identity names keep the pointer, because their title is the only place a truncated name can be read.',
+      'The canvas HUD’s key panel presses nothing, so a pointer over it reaches the canvas beneath rather than being swallowed by the Panel in the corner a Resource’s resize control lives in — while its toggle, the one control there, keeps the pointer.',
+  },
+  {
+    id: 'graph-hud-starts-hidden-on-a-small-canvas',
+    storyFile: 'surfaces/graph-hud.stories.tsx',
+    storyExport: 'Retained',
+    claim:
+      'On a canvas the size of a phone the canvas HUD starts with its Graph key and minimap hidden behind its toggle, which shows and hides them both; on a roomy canvas it starts shown.',
   },
   {
     id: 'graph-hud-key-follows-the-open-map',

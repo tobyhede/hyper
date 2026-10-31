@@ -8,6 +8,7 @@ import {
   graphChoices,
   graphLegendLineStroke,
   graphLegendMarkLine,
+  graphOverviewToggle,
   mapChoices,
   openResource,
   resourceControls,
@@ -209,9 +210,9 @@ test(
  * of React Flow's own, so a Panel swallows every gesture over its box — and the
  * HUD stands in the corner a Resource's bottom-right resize control lives in,
  * which is the harm `command-dock.css`'s bottom-edge offset already names for
- * the Dock. The key holds no control, so it hands the pointer back; the two
- * clipped names keep theirs, because their `title` is the only place a name
- * `truncate` has ellipsised can still be read.
+ * the Dock. The key is a list, so it hands the pointer back; its toggle keeps
+ * its own, because it is the one control there — it shows and hides the
+ * overview.
  *
  * The three gestures this buys back are asserted where they live rather than
  * restated here — the Open Resource drag in `editing.spec.ts`, Reference Resource A′'s
@@ -231,8 +232,7 @@ test(
         ([px, py]: readonly number[]) => {
           const element = document.elementFromPoint(px ?? 0, py ?? 0);
           if (element === null) return 'nothing';
-          if (element.closest('[data-testid="hud-space"], [data-testid="hud-map"]') !== null)
-            return 'name';
+          if (element.closest('.react-flow__panel button') !== null) return 'toggle';
           if (element.closest('.react-flow__panel') !== null) return 'hud';
           return 'canvas';
         },
@@ -243,12 +243,11 @@ test(
     expect(await topmostAt(key.x + key.width / 2, key.y + key.height / 2)).toBe('canvas');
     expect(await topmostAt(key.x + 4, key.y + 4)).toBe('canvas');
 
-    // The clipped names are the exception, so their `title` can be read.
-    const name = page.getByTestId('hud-space');
-    const nameBox = await boxOf(name, "the HUD's Space name");
-    expect(await topmostAt(nameBox.x + 4, nameBox.y + nameBox.height / 2)).toBe('name');
-    await expect(name).toHaveAttribute('title', 'Map fixture');
-    await expect(page.getByTestId('hud-map')).toHaveAttribute('title', 'Collection 1');
+    // The toggle is the exception: it is the control that hides the overview.
+    const toggle = await boxOf(graphOverviewToggle(page), "the HUD's toggle");
+    expect(await topmostAt(toggle.x + toggle.width / 2, toggle.y + toggle.height / 2)).toBe(
+      'toggle',
+    );
   },
 );
 
@@ -270,12 +269,6 @@ test(
     await page.goto('/');
     const legendItems = page.getByTestId('graph-legend').locator('.legend__item');
     await expect(legendItems).toHaveCount(3);
-
-    // The read-only identity says what the key belongs to, using the same
-    // selected Space and Map the Dock names rather than resolving again.
-    await expect(page.getByTestId('hud-space')).toHaveText('Map fixture');
-    await expect(page.getByTestId('hud-map')).toHaveText('Collection 1');
-    await expect(page.getByTestId('canvas-identity').getByRole('button')).toHaveCount(0);
 
     // Titles, in the same order from the selected Map.
     const choices = await graphChoices(page);

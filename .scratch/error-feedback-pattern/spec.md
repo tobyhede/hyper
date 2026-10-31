@@ -19,7 +19,8 @@ place each surface's field mapping lives — every record is
 surface has said where it goes. The channels are deliberate and written down in
 `docs/agents/ui.md`: `StatusFailure`/`StatusBusy` for a blocking operational
 state, `AlertDialog` for a decision or recovery action, `Alert` for a standing
-notice, `FieldError` for correctable input, and the screen-fixed
+notice (destructive for a refusal, neutral `role="status"` for a fact that is
+not a failure, never a mark in the Command Dock), `FieldError` for correctable input, and the screen-fixed
 `.canvas-refusal` sentence for the one case with no surface left to attach to.
 `docs/agents/authoring-refusal-cascade.md` caches the whole cascade.
 

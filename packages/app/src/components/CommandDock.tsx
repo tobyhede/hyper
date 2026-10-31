@@ -49,14 +49,12 @@ import {
   type RefObject,
 } from 'react';
 import {
-  Badge,
   CommandToolbar,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
-  UnsavedIcon,
   ToolbarButton,
 } from '@project/ui';
 import { canRetry } from '@project/persistence';
@@ -682,26 +680,6 @@ function PersistenceReport({
 }
 
 /**
- * That this session's Edits are kept only in the page and are lost on reload
- * (ADR 0131): a mounted session commits to a store in the page's memory, and
- * nothing writes back to where the talk was read from.
- *
- * **A mark, not a command and not a status region.** It is a `Badge`, so it is
- * text in the strip that no arrow key stops on and nothing announces unasked:
- * where a mounted session's Edits go is a fact about the whole session that
- * does not change while it is open, so there is nothing to announce. It trails
- * the clusters because it qualifies all of them.
- */
-function UnsavedMark() {
-  return (
-    <Badge variant="outline">
-      <UnsavedIcon data-icon="inline-start" aria-hidden="true" />
-      Edits lost on reload
-    </Badge>
-  );
-}
-
-/**
  * The Command Dock, docked to a slot and draggable between them.
  *
  * **The JSX below is the same in every orientation.** The edge derives one
@@ -787,12 +765,6 @@ export function CommandDock({
           />
           <Divider orientation={divider} />
           <ResourcesControl resources={chrome.resources} side={side} />
-          {chrome.unsaved ? (
-            <>
-              <Divider orientation={divider} />
-              <UnsavedMark />
-            </>
-          ) : null}
         </Dock>
       </DockRenamingContext.Provider>
     </DockDisclosureContext.Provider>

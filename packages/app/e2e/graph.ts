@@ -532,6 +532,13 @@ export function graphLegendMarkLine(scope: Locator): Locator {
   return scope.locator('[data-slot="graph-legend-mark-line"]');
 }
 
+/** The canvas HUD's toggle, which shows and hides the Graph key and the minimap. */
+export function graphOverviewToggle(page: Page): Locator {
+  return page
+    .locator('.react-flow__panel')
+    .getByRole('button', { name: 'Toggle graph overview', exact: true });
+}
+
 /** The resolved stroke of one Graph's legend mark line, by its title. */
 export async function graphLegendLineStroke(page: Page, title: string): Promise<string> {
   const line = graphLegendMarkLine(

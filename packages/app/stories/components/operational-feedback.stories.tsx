@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import type { Story } from '@ladle/react';
 import { PlacementFailure } from '#components/PlacementFailure';
 import { PlacementPending } from '#components/PlacementPending';
 import { StartupFailure } from '#components/StartupFailure';
 import { StartupPending } from '#components/StartupPending';
 import { SpaceAppFailureView } from '#components/SpaceAppFailureView';
+import { MountedEditsNotice } from '#components/ShellNotice';
 
 export default { title: 'Components/Operational Feedback' };
 
@@ -27,3 +29,9 @@ export const Placement: Story = () => (
 
 /** The canvas while a strategy is still arranging Resources. */
 export const Arranging: Story = () => <PlacementPending />;
+
+/** What a mounted session reports once the reader has made an Edit, until put away. */
+export const MountedEdits: Story = () => {
+  const [shown, setShown] = useState(true);
+  return shown ? <MountedEditsNotice onDismiss={() => setShown(false)} /> : null;
+};

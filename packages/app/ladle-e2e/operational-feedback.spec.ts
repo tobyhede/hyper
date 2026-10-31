@@ -74,3 +74,24 @@ test(
     await expect(page.getByRole('status')).toHaveText('Arranging…');
   },
 );
+
+test(
+  'mounted edits story reports politely where Edits are kept, and is put away by its dismissal',
+  { tag: '@parity:mounted-edits-notice-reports-where-edits-are-kept' },
+  async ({ page }) => {
+    await page.goto('/?story=components--operational-feedback--mounted-edits&mode=preview');
+
+    const notice = page.getByRole('status');
+    await expect(notice.getByText('Edits kept in this page only')).toBeVisible();
+    await expect(
+      notice.getByText(
+        'Reloading or closing this page discards them. Nothing is written to GitHub.',
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await expect(page.getByRole('alert')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Dismiss: Edits kept in this page only' }).click();
+    await expect(notice).toHaveCount(0);
+  },
+);

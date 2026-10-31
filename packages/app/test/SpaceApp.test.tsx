@@ -2004,8 +2004,8 @@ describe('Space app Map reading', () => {
     expect(screen.getByTestId('active-graph').querySelector('svg')?.style.stroke).toBe(
       'var(--graph-paint-123456, #123456)',
     );
-    // The canvas draws the Space title off the same answered view.
-    expect(screen.getByTestId('hud-space')).toHaveTextContent('Answered Space');
+    // The Space title is drawn off the same answered view.
+    expect(screen.getByTestId('space-title')).toHaveTextContent('Answered Space');
   });
 });
 

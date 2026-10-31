@@ -5,7 +5,7 @@ import { buttonVariants, FALLBACK_GRAPH_COLOR, graphPaint } from '@project/ui';
 
 const theme = readFileSync(new URL('../../packages/app/src/tailwind.css', import.meta.url), 'utf8');
 
-// The dark theme restates the semantic roles, so it is read after the sand
+// The dark theme restates the semantic roles, so it is read after the light
 // theme and its declarations win, as they do in the browser.
 const darkTheme = readFileSync(
   new URL('../../packages/app/src/theme-dark.css', import.meta.url),
@@ -18,7 +18,7 @@ const variablesOf = (css: string): ReadonlyMap<string, string> =>
 const variables = variablesOf(theme);
 
 const THEMES = [
-  { theme: 'sand', variables },
+  { theme: 'light', variables },
   { theme: 'dark', variables: variablesOf(`${theme}\n${darkTheme}`) },
 ] as const;
 

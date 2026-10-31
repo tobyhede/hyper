@@ -61,7 +61,9 @@ export function GraphHudFixture({ space = SPACE, activeGraphId }: GraphHudFixtur
   if (projected instanceof Error) return <p role="alert">Placement failed: {projected.message}</p>;
 
   return (
-    <StoryCanvasFrame height="h-[26rem]">
+    // Tall enough that the canvas inside the frame clears `GraphHud`'s phone
+    // threshold, so the HUD starts shown as it does on a desktop.
+    <StoryCanvasFrame height="h-[28rem]">
       <StoryCanvas
         nodes={projected.nodes}
         edges={projected.edges}
@@ -72,8 +74,6 @@ export function GraphHudFixture({ space = SPACE, activeGraphId }: GraphHudFixtur
         className="h-full"
       >
         <GraphHud
-          spaceTitle={space.title}
-          mapTitle={opening.map.title}
           graphs={projection.visibleGraphs}
           colorByGraphId={projection.colors}
           activeGraphId={emphasised}

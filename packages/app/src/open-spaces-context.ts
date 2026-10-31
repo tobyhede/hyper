@@ -1,5 +1,6 @@
 import { createContext, useContext, useSyncExternalStore } from 'react';
 import type { UUID } from '@project/core';
+import type { MountedEditsNotice } from './mounted-edits';
 import type { OpenSpaces, OpenSpacesState } from './open-spaces';
 
 /** Isolated single-Space mounts have no session-wide command surface. */
@@ -75,4 +76,25 @@ export const useAnySpaceReplacingImage = (): boolean => {
     spaces?.subscribe ?? noOpenSpacesChanges,
     () => (spaces?.getState ?? noOpenSpaces)().replacingImage,
   );
+};
+
+const quietMountedEdits = (): MountedEditsNotice => 'quiet';
+const noMountedEditsDismissal = (): void => undefined;
+
+/**
+ * Whether the page reports that a mounted session's Edits are kept in it only,
+ * and how the reader puts that report away. One answer for the whole page, so
+ * every open Space draws the same report and one dismissal puts away all of
+ * them. An isolated mount is never mounted, so it stays `quiet`.
+ */
+export const useMountedEditsNotice = () => {
+  const spaces = useOpenSpaces();
+  const notice = useSyncExternalStore(
+    spaces?.mountedEdits.subscribe ?? noOpenSpacesChanges,
+    spaces?.mountedEdits.getState ?? quietMountedEdits,
+  );
+  return {
+    notice,
+    dismiss: spaces?.mountedEdits.dismiss ?? noMountedEditsDismissal,
+  } satisfies { readonly notice: MountedEditsNotice; readonly dismiss: () => void };
 };
