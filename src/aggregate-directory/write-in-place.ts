@@ -75,7 +75,7 @@ const createTemporaryFile = async (
  * it half-written. On failure only the temporary file this call created is
  * removed.
  */
-const replaceFile = async (path: string, bytes: Uint8Array): Promise<void> => {
+export const replaceFile = async (path: string, bytes: Uint8Array): Promise<void> => {
   const { temporary, handle } = await createTemporaryFile(path);
   try {
     try {

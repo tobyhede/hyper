@@ -11,7 +11,7 @@
 - [x] `read_file` answers a file's text, and `write_file` creates or replaces one, creating its parent directories, by renaming a written temporary file over it
 - [x] `delete_file` removes one file
 - [x] `check` answers what `pnpm cube check` prints, for an accepted and a refused directory alike, from the same reading of the directory
-- [x] A path that is absolute, leaves `<dir>`, names a dot-entry or reaches outside `<dir>` through a symbolic link is refused, and nothing is read, written or deleted
+- [x] A path that is absolute, leaves `<dir>`, names a dot-entry or passes through a symbolic link is refused, and nothing is read, written or deleted
 - [x] A missing `<dir>` is refused before serving, naming `pnpm cube init`, and a path that is not a directory is refused; an empty directory is served, so a client can write a new aggregate into it
 - [x] Nothing but the protocol is written to standard output, so a client reading it is not interrupted
 - [x] `docs/aggregate-directory.md` and the authoring skill say how a client starts the server, and that a run serving the same directory overwrites what it writes

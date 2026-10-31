@@ -23,5 +23,10 @@ process.exitCode = await runInfinityCube(cliArguments(), {
   targets: { postgres, sqlite },
   launchRun,
   serveMcp: async (directory) =>
-    (await import('./mcp-stdio')).serveMcpOverStdio(directory, newUuid),
+    (await import('./mcp-stdio')).serveMcpOverStdio(
+      directory,
+      newUuid,
+      process.stdin,
+      process.stdout,
+    ),
 });

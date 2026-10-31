@@ -1,22 +1,20 @@
-import { randomBytes } from 'node:crypto';
-import { lstat, mkdir, readFile, readdir, realpath, rename, rm, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readFile, readdir, rm } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { UUID } from '@project/core';
 import { z } from 'zod';
-import { isMissingFile } from '../aggregate-directory';
+import { isMissingFile } from '../aggregate-directory/space-directory';
+import { replaceFile } from '../aggregate-directory/write-in-place';
 import { describeError } from '../cli/describe-error';
 import { describeRunRefusal } from '../cli/run-refusal';
 import { checkAggregate } from '../run/run';
 
-const INSTRUCTIONS = `This server edits one InfinityCube Aggregate directory: a talk's Spaces, Maps, Graphs and Resources as JSON and Markdown files. The format is https://github.com/tobyhede/infinity-cube/blob/main/docs/aggregate-directory.md. Call check after editing; it Imports the directory as pnpm cube run does and answers what it refuses. A run serving this directory overwrites what you write, so edit only a directory no run is serving.`;
+const INSTRUCTIONS = `This server edits one InfinityCube Aggregate directory: a talk's Spaces, Maps, Graphs and Resources as JSON and Markdown files. The format is https://github.com/tobyhede/infinity-cube/blob/main/docs/aggregate-directory.md. Call check after editing; it Imports the directory as pnpm cube run does and answers what it refuses. A run serving this directory overwrites what you write, so edit only a directory no run is serving. Paths are relative to the directory; dot-entries and symbolic links are refused.`;
 
-const answer = (text: string): CallToolResult => ({ content: [{ type: 'text', text }] });
-
-const refuse = (text: string): CallToolResult => ({
+const answer = (text: string, isError = false): CallToolResult => ({
   content: [{ type: 'text', text }],
-  isError: true,
+  isError,
 });
 
 class PathRefusal extends Error {}
@@ -27,11 +25,12 @@ class PathRefusal extends Error {}
  * the directory itself.
  */
 const lexicallyInside = (root: string, path: string): string => {
-  if (isAbsolute(path))
+  if (isAbsolute(path)) {
     throw new PathRefusal(`${path} is absolute; name a path inside the directory.`);
+  }
   const target = resolve(root, path);
   const inside = relative(root, target);
-  if (inside === '' || inside === '..' || inside.startsWith(`..${sep}`) || isAbsolute(inside)) {
+  if (inside === '' || inside === '..' || inside.startsWith(`..${sep}`)) {
     throw new PathRefusal(`${path} is not a file inside the directory.`);
   }
   if (inside.split(sep).some((segment) => segment.startsWith('.'))) {
@@ -41,31 +40,28 @@ const lexicallyInside = (root: string, path: string): string => {
 };
 
 /**
- * Refuse `target` when its nearest existing ancestor, or `target` itself when
- * it exists, resolves outside `root` through a symbolic link.
+ * Refuse `target` when it, or any directory between it and `root`, is a
+ * symbolic link, wherever the link points; `list_files` does not follow one
+ * either, so every path it answers passes.
  */
-const physicallyInside = async (root: string, target: string, path: string): Promise<void> => {
-  const realRoot = await realpath(root);
-  for (let candidate = target; ; candidate = dirname(candidate)) {
-    let real: string;
+const passesNoLink = async (root: string, target: string, path: string): Promise<void> => {
+  for (let candidate = target; candidate !== root; candidate = dirname(candidate)) {
     try {
-      real = await realpath(candidate);
+      if ((await lstat(candidate)).isSymbolicLink()) {
+        throw new PathRefusal(
+          `${path} passes through a symbolic link, which this server does not follow.`,
+        );
+      }
     } catch (error) {
-      if (isMissingFile(error) && candidate !== root) continue;
-      throw error;
+      if (!isMissingFile(error)) throw error;
     }
-    const inside = relative(realRoot, real);
-    if (inside === '..' || inside.startsWith(`..${sep}`) || isAbsolute(inside)) {
-      throw new PathRefusal(`${path} leaves the directory through a symbolic link.`);
-    }
-    return;
   }
 };
 
-/** The file `path` names inside `root`, refused unless it is inside lexically and physically. */
+/** The file `path` names inside `root`, refused unless it is inside and reached through no link. */
 const fileInside = async (root: string, path: string): Promise<string> => {
   const target = lexicallyInside(root, path);
-  await physicallyInside(root, target, path);
+  await passesNoLink(root, target, path);
   return target;
 };
 
@@ -87,7 +83,7 @@ const attempt = async (work: () => Promise<CallToolResult>): Promise<CallToolRes
   try {
     return await work();
   } catch (error) {
-    return refuse(error instanceof PathRefusal ? error.message : describeError(error));
+    return answer(error instanceof PathRefusal ? error.message : describeError(error), true);
   }
 };
 
@@ -133,14 +129,7 @@ export const createAggregateMcpServer = (directory: string, newId: () => UUID): 
       attempt(async () => {
         const target = await fileInside(directory, file);
         await mkdir(dirname(target), { recursive: true });
-        const temporary = `${target}.${randomBytes(6).toString('hex')}.tmp`;
-        await writeFile(temporary, content);
-        try {
-          await rename(temporary, target);
-        } catch (error) {
-          await rm(temporary, { force: true });
-          throw error;
-        }
+        await replaceFile(target, new TextEncoder().encode(content));
         return answer(`Wrote ${file}.`);
       }),
   );
@@ -150,7 +139,7 @@ export const createAggregateMcpServer = (directory: string, newId: () => UUID): 
     {
       description: 'Delete one file',
       inputSchema: { path },
-      annotations: { destructiveHint: true, idempotentHint: true },
+      annotations: { destructiveHint: true },
     },
     ({ path: file }) =>
       attempt(async () => {
@@ -168,15 +157,16 @@ export const createAggregateMcpServer = (directory: string, newId: () => UUID): 
         'Import the Aggregate directory as pnpm cube run does, answering whether it is accepted and, if not, why',
       annotations: { readOnlyHint: true },
     },
-    () =>
-      attempt(async () => {
+    async () => {
+      try {
         const result = await checkAggregate(directory, newId);
-        return answer(
-          result.kind === 'valid'
-            ? `${directory} is a valid aggregate.\n`
-            : describeRunRefusal(result, directory),
-        );
-      }),
+        return result.kind === 'valid'
+          ? answer(`${directory} is a valid aggregate.\n`)
+          : answer(describeRunRefusal(result, directory), true);
+      } catch (error) {
+        return answer(`Could not check ${directory}: ${describeError(error)}\n`, true);
+      }
+    },
   );
 
   return server;

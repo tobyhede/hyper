@@ -1,11 +1,13 @@
 import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { PassThrough } from 'node:stream';
 import { join, relative } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { newUuid, uuidSchema } from '@project/core';
 import { AGGREGATE_FILE_NAME } from '@project/aggregate';
 import { afterEach, describe, expect, it } from 'vitest';
+import { serveMcpOverStdio } from '../../src/cli/mcp-stdio';
 import { describeRunRefusal } from '../../src/cli/run-refusal';
 import { createAggregateMcpServer } from '../../src/mcp/aggregate-mcp-server';
 import { checkAggregate } from '../../src/run/run';
@@ -164,7 +166,7 @@ describe('the Aggregate directory MCP server', () => {
 
     const answer = await callTool(client, 'check');
 
-    expect(answer).toEqual({ text: describeRunRefusal(refused, directory), isError: false });
+    expect(answer).toEqual({ text: describeRunRefusal(refused, directory), isError: true });
     expect(answer.text).toContain(OPENING_ID);
   });
 
@@ -176,11 +178,16 @@ describe('the Aggregate directory MCP server', () => {
     { tool: 'read_file', path: `${SPACE_ID}/.hidden` },
     { tool: 'read_file', path: '' },
     { tool: 'read_file', path: 'linked/secret.txt' },
+    { tool: 'write_file', path: '/tmp/written-by-the-mcp-server.txt' },
     { tool: 'write_file', path: '../outside.txt' },
     { tool: 'write_file', path: '.git/config' },
     { tool: 'write_file', path: 'linked/secret.txt' },
     { tool: 'write_file', path: 'linked/new/file.txt' },
     { tool: 'write_file', path: '.' },
+    { tool: 'write_file', path: 'dangling/file.txt' },
+    { tool: 'write_file', path: `inner/space.json` },
+    { tool: 'read_file', path: `inner/space.json` },
+    { tool: 'delete_file', path: '/etc/hostname' },
     { tool: 'delete_file', path: '../outside.txt' },
     { tool: 'delete_file', path: '.git/HEAD' },
     { tool: 'delete_file', path: 'linked/secret.txt' },
@@ -195,6 +202,8 @@ describe('the Aggregate directory MCP server', () => {
     await mkdir(join(directory, '.git'));
     await writeFile(join(directory, '.git', 'HEAD'), 'ref: refs/heads/main\n');
     await symlink(outside, join(directory, 'linked'));
+    await symlink(join(outside, 'missing'), join(directory, 'dangling'));
+    await symlink(join(directory, SPACE_ID), join(directory, 'inner'));
     const before = await filesUnder(parent);
     const outsideBefore = await filesUnder(outside);
     const client = await connect(directory);
@@ -203,8 +212,29 @@ describe('the Aggregate directory MCP server', () => {
 
     expect(answer.isError).toBe(true);
     expect(answer.text).toMatch(/absolute|not a file inside|dot-entry|symbolic link/);
+    await expect(readFile('/tmp/written-by-the-mcp-server.txt')).rejects.toThrow();
     expect(answer.text).not.toMatch(/secret\n|outside\n|ref: refs/);
     expect(await filesUnder(parent)).toEqual(before);
     expect(await filesUnder(outside)).toEqual(outsideBefore);
+  });
+
+  it('serves over a pair of streams until the client ends its input', async () => {
+    const directory = await writeTalk();
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const lines: string[] = [];
+    output.on('data', (chunk: Buffer) => lines.push(...chunk.toString('utf8').split('\n')));
+
+    const served = serveMcpOverStdio(directory, newUuid, input, output);
+    input.write(
+      `${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'streams', version: '0.0.0' } } })}\n`,
+    );
+    input.end();
+
+    await expect(served).resolves.toBe(0);
+    const responses = lines.filter((line) => line !== '');
+    expect(responses).toHaveLength(1);
+    expect(responses[0]).toContain('"serverInfo":{"name":"infinity-cube"');
+    expect(responses[0]).toContain('"id":1}');
   });
 });
