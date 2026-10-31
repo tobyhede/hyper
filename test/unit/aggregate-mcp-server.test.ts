@@ -127,6 +127,38 @@ describe('the Aggregate directory MCP server', () => {
     );
   });
 
+  it("carries a binary file's bytes unchanged as base64", async () => {
+    const directory = await writeTalk();
+    const client = await connect(directory);
+    const bytes = Uint8Array.from([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff, 0xfe,
+    ]);
+    const image = 'images/picture.png';
+
+    const written = await callTool(client, 'write_file', {
+      path: image,
+      content: Buffer.from(bytes).toString('base64'),
+      encoding: 'base64',
+    });
+    const read = await callTool(client, 'read_file', { path: image, encoding: 'base64' });
+
+    expect(written.isError).toBe(false);
+    expect(new Uint8Array(await readFile(join(directory, image)))).toEqual(bytes);
+    expect(read).toEqual({ text: Buffer.from(bytes).toString('base64'), isError: false });
+  });
+
+  it('refuses to read a file that is not UTF-8 as text, naming base64', async () => {
+    const directory = await writeTalk();
+    await mkdir(join(directory, 'images'));
+    await writeFile(join(directory, 'images', 'picture.png'), Uint8Array.from([0x89, 0xff, 0x00]));
+    const client = await connect(directory);
+
+    const answer = await callTool(client, 'read_file', { path: 'images/picture.png' });
+
+    expect(answer.isError).toBe(true);
+    expect(answer.text).toContain('base64');
+  });
+
   it('deletes one file', async () => {
     const directory = await writeTalk();
     const client = await connect(directory);
@@ -161,6 +193,17 @@ describe('the Aggregate directory MCP server', () => {
 
     expect(answer).toEqual({ text: describeRunRefusal(refused, directory), isError: true });
     expect(answer.text).toContain(OPENING_ID);
+  });
+
+  it('checks an empty directory by saying what to write, naming no command', async () => {
+    const directory = await makeTemporaryDirectory();
+    const client = await connect(directory);
+
+    const answer = await callTool(client, 'check');
+
+    expect(answer.isError).toBe(true);
+    expect(answer.text).toContain(AGGREGATE_FILE_NAME);
+    expect(answer.text).not.toContain('pnpm');
   });
 
   it.each([

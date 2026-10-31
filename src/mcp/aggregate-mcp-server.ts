@@ -2,6 +2,7 @@ import { lstat, mkdir, readFile, readdir, rm } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { AGGREGATE_FILE_NAME } from '@project/aggregate';
 import type { UUID } from '@project/core';
 import { z } from 'zod';
 import { rejectSymbolicLinks, replaceFile } from '../aggregate-directory/write-in-place';
@@ -9,6 +10,8 @@ import { describeCheckFailure, describeError } from '../cli/describe-error';
 import { describeCheck } from '../cli/run-refusal';
 
 const INSTRUCTIONS = `This server edits one InfinityCube Aggregate directory: a talk's Spaces, Maps, Graphs and Resources as JSON and Markdown files. The format is https://github.com/tobyhede/infinity-cube/blob/main/docs/aggregate-directory.md. Call check after editing; it Imports the directory as pnpm cube run does and answers what it refuses. A run serving this directory overwrites what you write, so edit only a directory no run is serving. Paths are relative to the directory; dot-entries and symbolic links are refused.`;
+
+const EMPTY = `The directory holds no aggregate yet. Write ${AGGREGATE_FILE_NAME} and its Meta Space's directory as the format reference describes, then check again.`;
 
 const answer = (text: string, isError = false): CallToolResult => ({
   content: [{ type: 'text', text }],
@@ -82,6 +85,12 @@ export const createAggregateMcpServer = (given: string, newId: () => UUID): McpS
     { instructions: INSTRUCTIONS },
   );
   const path = z.string().describe('A file path relative to the Aggregate directory');
+  const encoding = z
+    .enum(['utf8', 'base64'])
+    .optional()
+    .describe(
+      "How the file's bytes are carried as text: utf8, the default, or base64 for a binary file such as an image",
+    );
 
   server.registerTool(
     'list_files',
@@ -95,26 +104,41 @@ export const createAggregateMcpServer = (given: string, newId: () => UUID): McpS
   server.registerTool(
     'read_file',
     {
-      description: "Read a file's text",
-      inputSchema: { path },
+      description: "Read a file's text, or its bytes as base64",
+      inputSchema: { path, encoding },
       annotations: { readOnlyHint: true },
     },
-    ({ path: file }) =>
-      attempt(async () => answer(await readFile(await fileInside(directory, file), 'utf8'))),
+    ({ path: file, encoding: carried }) =>
+      attempt(async () => {
+        const bytes = await readFile(await fileInside(directory, file));
+        if (carried === 'base64') return answer(bytes.toString('base64'));
+        try {
+          return answer(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+        } catch {
+          throw new PathRefusal(`${file} is not UTF-8 text; read it with encoding base64.`);
+        }
+      }),
   );
 
   server.registerTool(
     'write_file',
     {
       description: 'Create or replace a file, creating its parent directories',
-      inputSchema: { path, content: z.string().describe("The file's complete new text") },
+      inputSchema: {
+        path,
+        content: z.string().describe("The file's complete new text, or its bytes as base64"),
+        encoding,
+      },
       annotations: { destructiveHint: true, idempotentHint: true },
     },
-    ({ path: file, content }) =>
+    ({ path: file, content, encoding: carried }) =>
       attempt(async () => {
         const target = await fileInside(directory, file);
         await mkdir(dirname(target), { recursive: true });
-        await replaceFile(target, new TextEncoder().encode(content));
+        await replaceFile(
+          target,
+          carried === 'base64' ? Buffer.from(content, 'base64') : new TextEncoder().encode(content),
+        );
         return answer(`Wrote ${file}.`);
       }),
   );
@@ -145,7 +169,9 @@ export const createAggregateMcpServer = (given: string, newId: () => UUID): McpS
     async () => {
       try {
         const { checkAggregate } = await import('../run/run');
-        const { accepted, text } = describeCheck(await checkAggregate(directory, newId), directory);
+        const result = await checkAggregate(directory, newId);
+        if (result.kind === 'empty') return answer(EMPTY, true);
+        const { accepted, text } = describeCheck(result, directory);
         return answer(text, !accepted);
       } catch (error) {
         return answer(describeCheckFailure(directory, error), true);
