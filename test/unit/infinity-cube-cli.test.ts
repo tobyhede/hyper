@@ -1,17 +1,7 @@
-import {
-  access,
-  lstat,
-  mkdtemp,
-  mkdir,
-  readdir,
-  readFile,
-  rm,
-  symlink,
-  writeFile,
-} from 'node:fs/promises';
+import { access, lstat, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join, relative } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { newUuid, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import type { LoadedSpace } from '@project/persistence';
@@ -26,6 +16,7 @@ import type { DatabaseTarget } from '../../src/database/database-target';
 import { type SpaceRepository, AGGREGATE_FILE_NAME } from '@project/aggregate';
 import { readSingleSpace } from '../../src/aggregate-directory';
 import {
+  filesUnder,
   markdownResourceFiles,
   writeAggregateInto,
   type SpaceDirectory,
@@ -1162,9 +1153,8 @@ describe('runInfinityCube', () => {
         io: output.io,
         newId: newUuid,
         targets: { postgres: heldTarget(repository), sqlite: unreachedTarget('sqlite') },
+        ...unlaunched,
         workingDirectory,
-        launchRun: unlaunched.launchRun,
-        serveMcp: unlaunched.serveMcp,
       });
 
     expect(await over(['import', basename(directory)])).toBe(0);
@@ -1351,17 +1341,6 @@ describe('runInfinityCube author verbs', () => {
   const noStores = {
     postgres: unreachedTarget('postgres'),
     sqlite: unreachedTarget('sqlite'),
-  };
-
-  /** Every file under `directory`, by relative path, with its contents. */
-  const filesUnder = async (directory: string): Promise<Record<string, string>> => {
-    const entries = await readdir(directory, { recursive: true, withFileTypes: true });
-    const files: Record<string, string> = {};
-    for (const entry of entries.filter((candidate) => candidate.isFile())) {
-      const path = join(entry.parentPath, entry.name);
-      files[relative(directory, path)] = await readFile(path, 'base64');
-    }
-    return files;
   };
 
   const author = (args: readonly string[], workingDirectory: string) => {

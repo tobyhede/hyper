@@ -4,11 +4,9 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { UUID } from '@project/core';
 import { z } from 'zod';
-import { isMissingFile } from '../aggregate-directory/space-directory';
-import { replaceFile } from '../aggregate-directory/write-in-place';
-import { describeError } from '../cli/describe-error';
-import { describeRunRefusal } from '../cli/run-refusal';
-import { checkAggregate } from '../run/run';
+import { rejectSymbolicLinks, replaceFile } from '../aggregate-directory/write-in-place';
+import { describeCheckFailure, describeError } from '../cli/describe-error';
+import { describeCheck } from '../cli/run-refusal';
 
 const INSTRUCTIONS = `This server edits one InfinityCube Aggregate directory: a talk's Spaces, Maps, Graphs and Resources as JSON and Markdown files. The format is https://github.com/tobyhede/infinity-cube/blob/main/docs/aggregate-directory.md. Call check after editing; it Imports the directory as pnpm cube run does and answers what it refuses. A run serving this directory overwrites what you write, so edit only a directory no run is serving. Paths are relative to the directory; dot-entries and symbolic links are refused.`;
 
@@ -39,29 +37,15 @@ const lexicallyInside = (root: string, path: string): string => {
   return target;
 };
 
-/**
- * Refuse `target` when it, or any directory between it and `root`, is a
- * symbolic link, wherever the link points; `list_files` does not follow one
- * either, so every path it answers passes.
- */
-const passesNoLink = async (root: string, target: string, path: string): Promise<void> => {
-  for (let candidate = target; candidate !== root; candidate = dirname(candidate)) {
-    try {
-      if ((await lstat(candidate)).isSymbolicLink()) {
-        throw new PathRefusal(
-          `${path} passes through a symbolic link, which this server does not follow.`,
-        );
-      }
-    } catch (error) {
-      if (!isMissingFile(error)) throw error;
-    }
-  }
-};
-
 /** The file `path` names inside `root`, refused unless it is inside and reached through no link. */
 const fileInside = async (root: string, path: string): Promise<string> => {
   const target = lexicallyInside(root, path);
-  await passesNoLink(root, target, path);
+  await rejectSymbolicLinks(
+    root,
+    [relative(root, target)],
+    () =>
+      new PathRefusal(`${path} passes through a symbolic link, which this server does not follow.`),
+  );
   return target;
 };
 
@@ -91,7 +75,8 @@ const attempt = async (work: () => Promise<CallToolResult>): Promise<CallToolRes
  * An MCP server whose tools list, read, write and delete the files of the
  * Aggregate directory `directory` and check it as `pnpm cube check` does.
  */
-export const createAggregateMcpServer = (directory: string, newId: () => UUID): McpServer => {
+export const createAggregateMcpServer = (given: string, newId: () => UUID): McpServer => {
+  const directory = resolve(given);
   const server = new McpServer(
     { name: 'infinity-cube', version: '0.0.0' },
     { instructions: INSTRUCTIONS },
@@ -159,12 +144,11 @@ export const createAggregateMcpServer = (directory: string, newId: () => UUID): 
     },
     async () => {
       try {
-        const result = await checkAggregate(directory, newId);
-        return result.kind === 'valid'
-          ? answer(`${directory} is a valid aggregate.\n`)
-          : answer(describeRunRefusal(result, directory), true);
+        const { checkAggregate } = await import('../run/run');
+        const { accepted, text } = describeCheck(await checkAggregate(directory, newId), directory);
+        return answer(text, !accepted);
       } catch (error) {
-        return answer(`Could not check ${directory}: ${describeError(error)}\n`, true);
+        return answer(describeCheckFailure(directory, error), true);
       }
     },
   );

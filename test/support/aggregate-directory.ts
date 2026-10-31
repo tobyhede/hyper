@@ -1,5 +1,5 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { join, relative } from 'node:path';
 import { AGGREGATE_FILE_VERSION, type ResourceFileDocument, type UUID } from '@project/core';
 import { AGGREGATE_FILE_NAME } from '@project/aggregate';
 
@@ -63,4 +63,15 @@ export const writeAggregateInto = async (
     }
   }
   return root;
+};
+
+/** Every file under `directory`, by relative path, with its contents in base64. */
+export const filesUnder = async (directory: string): Promise<Record<string, string>> => {
+  const entries = await readdir(directory, { recursive: true, withFileTypes: true });
+  const files: Record<string, string> = {};
+  for (const entry of entries.filter((candidate) => candidate.isFile())) {
+    const path = join(entry.parentPath, entry.name);
+    files[relative(directory, path)] = await readFile(path, 'base64');
+  }
+  return files;
 };

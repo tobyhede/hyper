@@ -10,18 +10,9 @@ export type DatabaseCommand =
     }
   | { readonly verb: 'export'; readonly directory: string; readonly store: InfinityCubeStore };
 
-export interface InitCommand {
-  readonly verb: 'init';
-  readonly directory: string;
-}
-
-export interface CheckCommand {
-  readonly verb: 'check';
-  readonly directory: string;
-}
-
-export interface McpCommand {
-  readonly verb: 'mcp';
+/** A verb that takes one directory and nothing else. */
+export interface DirectoryCommand {
+  readonly verb: 'init' | 'check' | 'mcp';
   readonly directory: string;
 }
 
@@ -34,12 +25,7 @@ export interface RunCommand {
 }
 
 export type InfinityCubeCommand =
-  | { readonly verb: 'help' }
-  | InitCommand
-  | RunCommand
-  | CheckCommand
-  | McpCommand
-  | DatabaseCommand;
+  { readonly verb: 'help' } | DirectoryCommand | RunCommand | DatabaseCommand;
 
 interface VerbLine {
   readonly synopsis: string;

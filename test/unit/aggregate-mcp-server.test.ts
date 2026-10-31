@@ -1,7 +1,7 @@
-import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { PassThrough } from 'node:stream';
-import { join, relative } from 'node:path';
+import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { newUuid, uuidSchema } from '@project/core';
@@ -11,7 +11,11 @@ import { serveMcpOverStdio } from '../../src/cli/mcp-stdio';
 import { describeRunRefusal } from '../../src/cli/run-refusal';
 import { createAggregateMcpServer } from '../../src/mcp/aggregate-mcp-server';
 import { checkAggregate } from '../../src/run/run';
-import { markdownResourceFiles, writeAggregateInto } from '../support/aggregate-directory';
+import {
+  filesUnder,
+  markdownResourceFiles,
+  writeAggregateInto,
+} from '../support/aggregate-directory';
 import { callTool } from '../support/mcp-tool-answer';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
@@ -41,17 +45,6 @@ const writeTalk = async (root?: string): Promise<string> =>
       resources: markdownResourceFiles(OPENING_ID, 'Opening', 'Hello.\n'),
     },
   ]);
-
-/** Every file under `directory`, by relative path, with its contents. */
-const filesUnder = async (directory: string): Promise<Record<string, string>> => {
-  const entries = await readdir(directory, { recursive: true, withFileTypes: true });
-  const files: Record<string, string> = {};
-  for (const entry of entries.filter((candidate) => candidate.isFile())) {
-    const path = join(entry.parentPath, entry.name);
-    files[relative(directory, path)] = await readFile(path, 'base64');
-  }
-  return files;
-};
 
 /** A client connected in memory to the server for `directory`, as a local MCP client connects. */
 const connect = async (directory: string): Promise<Client> => {

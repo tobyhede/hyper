@@ -1,7 +1,6 @@
 import { stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { isMissingFile } from '../aggregate-directory/space-directory';
-import { describeError } from './describe-error';
+import { describeCheckFailure, describeError } from './describe-error';
 import type { UUID } from '@project/core';
 import type { DatabaseTarget } from '../database/database-target';
 import {
@@ -56,25 +55,22 @@ const check = async (
   directory: string,
   { io, newId }: Pick<InfinityCubeDependencies, 'io' | 'newId'>,
 ): Promise<number> => {
-  /** What the author reads when the directory is refused; `undefined` when it is accepted. */
-  let refusal: string | undefined;
   try {
-    const { checkAggregate } = await import('../run/run');
-    const result = await checkAggregate(directory, newId);
-    if (result.kind !== 'valid') {
-      const { describeRunRefusal } = await import('./run-refusal');
-      refusal = describeRunRefusal(result, directory);
+    const [{ checkAggregate }, { describeCheck }] = await Promise.all([
+      import('../run/run'),
+      import('./run-refusal'),
+    ]);
+    const { accepted, text } = describeCheck(await checkAggregate(directory, newId), directory);
+    if (!accepted) {
+      io.stderr(text);
+      return 1;
     }
+    io.stdout(text);
+    return 0;
   } catch (error) {
-    io.stderr(`Could not check ${directory}: ${describeError(error)}\n`);
+    io.stderr(describeCheckFailure(directory, error));
     return 1;
   }
-  if (refusal !== undefined) {
-    io.stderr(refusal);
-    return 1;
-  }
-  io.stdout(`${directory} is a valid aggregate.\n`);
-  return 0;
 };
 
 /**
@@ -90,6 +86,7 @@ const mcp = async (
   try {
     isDirectory = (await stat(directory)).isDirectory();
   } catch (error) {
+    const { isMissingFile } = await import('../aggregate-directory/space-directory');
     if (isMissingFile(error)) {
       io.stderr(
         `${directory} does not exist. To create an aggregate there: pnpm cube init ${shellWord(directory)}\n`,
