@@ -448,3 +448,35 @@ test(
     expect(resources.x + resources.width).toBeLessThanOrEqual(graph.x + graph.width + 1);
   },
 );
+
+test(
+  "the Dock's theme cluster turns the application over and keeps the choice",
+  { tag: '@parity:command-dock-chooses-theme' },
+  async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.goto('/');
+    await expect(nodeByTitle(page, 'A')).toBeVisible();
+    await settled(page);
+    const root = page.locator('html');
+    // System until chosen, so the dark system draws dark.
+    await expect(root).toHaveAttribute('data-theme', 'dark');
+    const ground = () =>
+      root.evaluate((element) => getComputedStyle(element).getPropertyValue('--background').trim());
+    const darkGround = await ground();
+
+    await dock(page).getByRole('button', { name: 'Theme: System', exact: true }).click();
+    const menu = page.getByRole('menu').last();
+    await expect(menu.getByRole('menuitemradio')).toHaveText(['Light', 'Dark', 'System']);
+    await menu.getByRole('menuitemradio', { name: 'Light' }).click();
+    await expect(root).toHaveAttribute('data-theme', 'light');
+    // The tokens follow the attribute, not the system, which is still dark.
+    expect(await ground()).not.toBe(darkGround);
+
+    await page.reload();
+    await expect(nodeByTitle(page, 'A')).toBeVisible();
+    await expect(root).toHaveAttribute('data-theme', 'light');
+    await expect(
+      dock(page).getByRole('button', { name: 'Theme: Light', exact: true }),
+    ).toBeVisible();
+  },
+);

@@ -87,6 +87,41 @@ test(
 );
 
 /**
+ * The theme is one exclusive list of three, and choosing turns the page over
+ * at once: `data-theme` on the root is what every theme rule keys off. A
+ * reload keeps the choice, because it is kept in the browser.
+ */
+test(
+  'the theme cluster chooses Light, Dark or System and keeps the choice',
+  { tag: '@parity:command-dock-chooses-theme' },
+  async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'light' });
+    await page.goto(story('themed'));
+    const root = page.locator('html');
+    await expect(root).toHaveAttribute('data-theme', 'light');
+
+    const menu = await disclose(page, 'Theme: System');
+    await expect(menu.getByRole('menuitemradio')).toHaveText(['Light', 'Dark', 'System']);
+    await expect(menu.getByRole('menuitemradio', { name: 'System' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+
+    await menu.getByRole('menuitemradio', { name: 'Dark' }).click();
+    await expect(root).toHaveAttribute('data-theme', 'dark');
+    await expect(
+      surface(page).getByRole('button', { name: 'Theme: Dark', exact: true }),
+    ).toBeVisible();
+
+    await page.reload();
+    await expect(root).toHaveAttribute('data-theme', 'dark');
+    await expect(
+      surface(page).getByRole('button', { name: 'Theme: Dark', exact: true }),
+    ).toBeVisible();
+  },
+);
+
+/**
  * New Map is in the Map menu, beside the list it adds to, and it adds an
  * *empty* one (ADR 0079, ADR 0080).
  *

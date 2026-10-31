@@ -170,6 +170,9 @@ export {
   PresentIcon,
   UnsavedIcon,
   StopPresentingIcon,
+  LightThemeIcon,
+  DarkThemeIcon,
+  SystemThemeIcon,
 } from './icons';
 export type { ResourceBaseKind } from './icons';
 export {

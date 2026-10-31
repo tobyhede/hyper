@@ -41,6 +41,7 @@
  */
 import {
   Fragment,
+  useContext,
   useEffect,
   useRef,
   useState,
@@ -91,6 +92,8 @@ import type { DockChrome, DockPersistence } from './command-dock-chrome';
 import { SpacesControl } from './CommandDockSpaces';
 import { GraphControls, MapControls } from './CommandDockMapGraph';
 import { ResourcesControl } from './CommandDockResources';
+import { ThemeControl } from './CommandDockTheme';
+import { ColorSchemeContext } from '../color-scheme';
 import './command-dock.css';
 
 /* ------------------------------------------------------------------ state */
@@ -713,6 +716,7 @@ export function CommandDock({
   // A rule divides across the dock's own axis, so it runs the other way.
   const divider = vertical ? 'horizontal' : 'vertical';
   const side = MENU_SIDE[dock.edge];
+  const colorScheme = useContext(ColorSchemeContext);
 
   return (
     <DockDisclosureContext.Provider value={{ openId, setOpenId }}>
@@ -765,6 +769,15 @@ export function CommandDock({
           />
           <Divider orientation={divider} />
           <ResourcesControl resources={chrome.resources} side={side} />
+          {/* The page's theme rather than the Space's, so it comes after
+              everything the Space is made of. Drawn only where the entry
+              composed a theme to choose. */}
+          {colorScheme === null ? null : (
+            <>
+              <Divider orientation={divider} />
+              <ThemeControl colorScheme={colorScheme} side={side} />
+            </>
+          )}
         </Dock>
       </DockRenamingContext.Provider>
     </DockDisclosureContext.Provider>

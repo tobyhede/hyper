@@ -21,6 +21,8 @@ import {
   Maximize2,
   Minus,
   Minimize2,
+  Monitor,
+  Moon,
   Pencil,
   Play,
   Plus,
@@ -29,6 +31,7 @@ import {
   Search,
   Square,
   StickyNote,
+  Sun,
   Trash2,
   Unlink,
   X,
@@ -162,6 +165,15 @@ export const CloseResourceIcon = (props: ResourceActionIconProps) => (
 
 /** The shared affordance for a trigger that opens a list or menu. */
 export const ChevronDownIcon = () => <ChevronDown size={14} />;
+
+/** The light theme, and the theme control while light is drawn. */
+export const LightThemeIcon = () => <Sun size={16} />;
+
+/** The dark theme, and the theme control while dark is drawn. */
+export const DarkThemeIcon = () => <Moon size={16} />;
+
+/** A theme that follows the operating system's. */
+export const SystemThemeIcon = () => <Monitor size={16} />;
 
 /** Search within the collection named by the surrounding input. */
 export const SearchIcon = () => <Search size={16} />;

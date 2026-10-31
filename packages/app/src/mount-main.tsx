@@ -9,6 +9,8 @@ import { GitHubLocationForm } from './components/GitHubLocationForm';
 import { createBrowserFullscreen } from './browser-fullscreen';
 import { createBrowserHistory } from './browser-history';
 import { createBrowserPresentationLinks } from './browser-presentation-channel';
+import { createBrowserColorScheme } from './browser-color-scheme';
+import { ColorSchemeContext } from './color-scheme';
 import { resolveMountSource } from './mount/mount-source';
 import { createMountedStartup } from './mount/mounted-startup';
 import { sourceParameter } from './source-parameter';
@@ -24,6 +26,7 @@ import { sourceParameter } from './source-parameter';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error('Root element #root not found');
+const colorScheme = createBrowserColorScheme(window);
 const root = createRoot(rootElement);
 
 const configured = import.meta.env.VITE_DEFAULT_SPACE_SOURCE;
@@ -59,5 +62,9 @@ if (source.kind === 'ask') {
     // everything the application writes goes through it after.
     history: createBrowserHistory(window),
   });
-  root.render(<Application resolve={() => startup.resolve(window.location.pathname)} />);
+  root.render(
+    <ColorSchemeContext.Provider value={colorScheme}>
+      <Application resolve={() => startup.resolve(window.location.pathname)} />
+    </ColorSchemeContext.Provider>,
+  );
 }
