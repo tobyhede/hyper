@@ -58,12 +58,36 @@ The file format, including what InfinityCube keeps and removes when it writes, i
 
 ## Using InfinityCube with agents
 
-This repository carries four agent skills, in [`.agents/skills/`](.agents/skills/) and linked from `.claude/skills/`. Two are for using InfinityCube:
+This repository carries four agent skills, in [`.agents/skills/`](.agents/skills/) and linked from `.claude/skills/`. Two are for using InfinityCube, and are also published as the `infinity-cube` plugin, from [`plugins/infinity-cube/`](plugins/infinity-cube/):
 
 - **`infinity-cube-getting-started`**: sets a person up from a fresh clone: checks Node and pnpm, installs, chooses or creates the content directory as its own git repository, and starts a run.
 - **`infinity-cube-authoring`**: writes or changes an Aggregate directory as files: Spaces, Resources, Maps, Graphs, Edges and pictures. It stops the run first, because InfinityCube's next write would replace edits made underneath it.
 
 The other two, `shadcn-first-ui` and `shadcn`, are for developing InfinityCube's own UI.
+
+### Installing the skills elsewhere
+
+A clone of this repository already has the skills. To use them from another directory, such as a talk's own repository, install the plugin from this repository's marketplace, `infinity-cube`. Both products install at user scope, so the skills are available in every project, and cache the plugin by version, so a change reaches installed copies only when the version in all three of `plugins/infinity-cube/plugin.json`, `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` is bumped (`test/unit/skills-marketplace.test.ts` holds them equal).
+
+Claude Code:
+
+```sh
+claude plugin marketplace add tobyhede/infinity-cube
+claude plugin install infinity-cube@infinity-cube
+```
+
+Start a new session; the skills are `/infinity-cube:infinity-cube-authoring` and `/infinity-cube:infinity-cube-getting-started`. To update: `claude plugin marketplace update infinity-cube`, then `claude plugin update infinity-cube@infinity-cube`.
+
+Codex:
+
+```sh
+codex plugin marketplace add tobyhede/infinity-cube --ref main
+codex plugin add infinity-cube@infinity-cube
+```
+
+Start a new session and pick a skill with `/skills` or `$`. To update: `codex plugin marketplace upgrade infinity-cube`, then `codex plugin remove infinity-cube@infinity-cube` and `codex plugin add infinity-cube@infinity-cube`.
+
+A chat application with no shell reaches neither command. For one that accepts an uploaded skill, zip the skill's directory under `plugins/infinity-cube/skills/`; `infinity-cube-authoring` links only by absolute URL so that it works there, and says that a directory it writes is unchecked until `pnpm cube check` runs.
 
 ## Developing InfinityCube
 

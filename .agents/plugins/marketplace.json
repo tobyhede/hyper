@@ -1,0 +1,20 @@
+{
+  "name": "infinity-cube",
+  "interface": {
+    "displayName": "InfinityCube"
+  },
+  "plugins": [
+    {
+      "name": "infinity-cube",
+      "source": {
+        "source": "local",
+        "path": "./plugins/infinity-cube"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

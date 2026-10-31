@@ -228,7 +228,9 @@ This one goes. In `packages/graph/src/snapshot-edits.ts`, the module summary:
 
 ## Skills
 
-Skills are tracked, so every clone and worktree has them. The files live under `.agents/skills/` — the repo-wide location Codex reads — and `.claude/skills/` holds a symlink per skill, which is where Claude Code reads (`test/unit/agent-skill-symlinks.test.ts` holds the mirror).
+Skills are tracked, so every clone and worktree has them. `.agents/skills/` is the repo-wide location Codex reads, and `.claude/skills/` holds a symlink per skill into it, which is where Claude Code reads. The files of `infinity-cube-authoring` and `infinity-cube-getting-started` live in the `infinity-cube` plugin, under `plugins/infinity-cube/skills/`, and `.agents/skills/` holds a symlink to each, so an install of the plugin and this repository read the same files (`test/unit/agent-skill-symlinks.test.ts` holds both sets of links).
+
+The plugin is published from this repository's marketplace, `infinity-cube`: `.claude-plugin/marketplace.json` for Claude Code and `.agents/plugins/marketplace.json` for Codex, each pointing at `./plugins/infinity-cube`. Both products cache an installed plugin by version, so a change to either skill reaches installed copies only when `version` is bumped in all three manifests, `plugins/infinity-cube/plugin.json`, `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json`, together; `test/unit/skills-marketplace.test.ts` fails when they differ. With Claude Code installed, `claude plugin validate . --strict` and `claude plugin validate plugins/infinity-cube --strict` check the catalog and the plugin. The install commands are in the README, "Installing the skills elsewhere".
 
 Tracking both paths is deliberate. An ordinary `git worktree add` populates only tracked files, so an ignored skill is missing from every worktree — and tracking just one of the two locations fixes just one of the two harnesses.
 

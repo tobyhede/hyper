@@ -7,7 +7,7 @@ description: Set a person up to run InfinityCube on their own content from a clo
 
 InfinityCube runs from a clone of this repository. `pnpm cube init <dir>` creates an Aggregate directory, and `pnpm cube run <dir>` **runs** one: it reads `<dir>`, serves the application, and writes every edit back into `<dir>`. The person's work is that directory, kept in its own git repository; git is their undo and their history.
 
-Work from the root of the InfinityCube clone. Each step ends on its completion criterion.
+Work from the root of the InfinityCube clone. With no clone at hand, as when this skill is installed from the `infinity-cube` plugin, make one where the person agrees to: `git clone https://github.com/tobyhede/infinity-cube`. Each step ends on its completion criterion.
 
 ## Steps
 
