@@ -20,6 +20,8 @@ import { runDatabaseCli } from '../../src/cli/database-entry';
 import type { DatabaseCommand, RunCommand } from '../../src/cli/arguments';
 import type { CliIo } from '../../src/cli/io';
 import { runInfinityCube } from '../../src/cli/run';
+import { describeRunRefusal } from '../../src/cli/run-process';
+import { startRun } from '../../src/run/run';
 import type { DatabaseTarget } from '../../src/database/database-target';
 import { type SpaceRepository, AGGREGATE_FILE_NAME } from '@project/aggregate';
 import { readSingleSpace } from '../../src/aggregate-directory';
@@ -50,7 +52,7 @@ const STORED_RESOURCE_FILE = `${JSON.stringify(
   2,
 )}\n`;
 
-const USAGE = 'Usage: cube <init|run|import|export|help> [arguments]\n';
+const USAGE = 'Usage: cube <init|run|check|import|export|help> [arguments]\n';
 
 const storedSpace: LoadedSpace = {
   snapshot: {
@@ -690,6 +692,11 @@ describe('runInfinityCube', () => {
     { args: ['init', 'talk', '--no-open'] },
     { args: ['init', 'talk', '--store', 'postgres'] },
     { args: ['init', 'talk', '--store', 'sqlite'] },
+    { args: ['check'] },
+    { args: ['check', ''] },
+    { args: ['check', 'first', 'second'] },
+    { args: ['check', 'talk', '--no-open'] },
+    { args: ['check', 'talk', '--store', 'sqlite'] },
     { args: ['run'] },
     { args: ['run', ''] },
     { args: ['run', 'first', 'second'] },
@@ -1060,6 +1067,7 @@ describe('runInfinityCube', () => {
       expect(verbLines.map((line) => line.split(/\s+/)[2])).toEqual([
         'init',
         'run',
+        'check',
         'import',
         'export',
         'help',
@@ -1404,6 +1412,108 @@ describe('runInfinityCube author verbs', () => {
     ]);
     expect(await filesUnder(directory)).toEqual(before);
   });
+
+  it('check accepts a valid aggregate, writing nothing and launching no run', async () => {
+    const directory = await writeSingleSpaceAggregate();
+    const before = await filesUnder(directory);
+
+    const { output, launched, exitCode } = author(['check', directory], '/authors/home');
+
+    expect(await exitCode).toBe(0);
+    expect(output.stderr).toEqual([]);
+    expect(output.stdout).toEqual([`${directory} is a valid aggregate.\n`]);
+    expect(launched).toEqual([]);
+    expect(await filesUnder(directory)).toEqual(before);
+  });
+
+  it('check accepts a hand-written aggregate that omits Map and Graph ids without writing them', async () => {
+    const directory = await writeAggregate(SPACE_ID, [
+      {
+        name: SPACE_ID,
+        spaceFile: JSON.stringify({
+          version: 1,
+          title: 'Hand-written',
+          maps: [
+            {
+              title: 'Only map',
+              kind: 'positioned',
+              positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
+              graphs: [{ title: 'Only graph', edges: [] }],
+            },
+          ],
+        }),
+        resources: markdownResourceFiles(RESOURCE_ID, 'Opening', 'Hello.\n'),
+      },
+    ]);
+    const before = await filesUnder(directory);
+
+    const { output, exitCode } = author(['check', directory], '/authors/home');
+
+    expect(output.stderr).toEqual([]);
+    expect(await exitCode).toBe(0);
+    expect(await filesUnder(directory)).toEqual(before);
+  });
+
+  it('check refuses what a run refuses, printing the same problems', async () => {
+    const directory = await writeAggregate(SPACE_ID, [
+      {
+        name: SPACE_ID,
+        spaceFile: JSON.stringify({
+          version: 1,
+          id: SPACE_ID,
+          title: 'Dangling',
+          maps: [
+            {
+              id: OTHER_SPACE_ID,
+              title: 'Only map',
+              kind: 'positioned',
+              positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
+              graphs: [{ id: GRAPH_ID, title: 'Only graph', edges: [] }],
+            },
+          ],
+        }),
+        resources: markdownResourceFiles(OPENING_ID, 'Opening', 'Hello.\n'),
+      },
+    ]);
+    const before = await filesUnder(directory);
+    const started = await startRun(directory, {
+      newId: newUuid,
+      schedule: () => () => undefined,
+      report: () => undefined,
+    });
+    if (started.kind === 'running') throw new Error('A run accepted a dangling placement');
+
+    const { output, exitCode } = author(['check', directory], '/authors/home');
+
+    expect(await exitCode).toBe(1);
+    expect(output.stdout).toEqual([]);
+    expect(output.stderr).toEqual([describeRunRefusal(started, directory)]);
+    expect(output.stderr.join('')).toContain(RESOURCE_ID);
+    expect(await filesUnder(directory)).toEqual(before);
+  });
+
+  it.each([
+    { holding: 'nothing, being missing', make: () => Promise.resolve() },
+    {
+      holding: 'only dot-entries',
+      make: (directory: string) => mkdir(join(directory, '.git'), { recursive: true }),
+    },
+  ])(
+    'check refuses a directory holding $holding, naming init, relative to the working directory',
+    async ({ make }) => {
+      const workingDirectory = await makeTemporaryDirectory();
+      const directory = join(workingDirectory, 'rust asycn');
+      await make(directory);
+
+      const { output, exitCode } = author(['check', 'rust asycn'], workingDirectory);
+
+      expect(await exitCode).toBe(1);
+      expect(output.stdout).toEqual([]);
+      expect(output.stderr).toEqual([
+        `${directory} holds no aggregate: it is missing or empty. To create one there: pnpm cube init '${directory}'\n`,
+      ]);
+    },
+  );
 
   it.each([
     {

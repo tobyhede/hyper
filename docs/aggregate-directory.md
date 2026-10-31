@@ -1,6 +1,6 @@
 # The Aggregate directory
 
-An **Aggregate directory** is the on-disk form of everything InfinityCube holds: every Space, rooted at the Meta Space, plus the pictures its Image Resources show. `pnpm cube init <dir>` creates one, `pnpm cube run <dir>` runs one ([ADR 0117](adr/0117-running-serves-an-aggregate-directory-as-the-durable-copy.md)), and `pnpm cube import` and `pnpm cube export` Import one into a database and Export one back out ([ADR 0124](adr/0124-one-hyper-cli.md)). Exporting writes the same format whichever store it reads from.
+An **Aggregate directory** is the on-disk form of everything InfinityCube holds: every Space, rooted at the Meta Space, plus the pictures its Image Resources show. `pnpm cube init <dir>` creates one, `pnpm cube run <dir>` runs one ([ADR 0117](adr/0117-running-serves-an-aggregate-directory-as-the-durable-copy.md)), `pnpm cube check <dir>` reads one as a run would without serving or writing it, and `pnpm cube import` and `pnpm cube export` Import one into a database and Export one back out ([ADR 0124](adr/0124-one-hyper-cli.md)). Exporting writes the same format whichever store it reads from.
 
 The directory is plain files meant for git: JSON in a fixed key order, one JSON Resource file per Resource with a Markdown Resource's source beside it, and pictures named by their content. Exporting the same content twice writes the same bytes, so a diff shows only what changed.
 
@@ -195,7 +195,7 @@ Two layers:
 - **Shape.** Zod schemas in `@project/core` check `aggregate.json`, each `space.json` and each Resource file. The same shapes are published as JSON Schema in [`docs/schema/`](schema/README.md).
 - **References.** `@project/graph` checks that every Edge, placement, `activeGraph`, `defaultMap` and Reference Resource `target` resolves inside its Space, that there are no duplicate Ids or duplicate Edges, and then the aggregate rules above across Spaces.
 
-`pnpm cube run` and `pnpm cube import` print what they refuse and exit non-zero. A file that cannot be read is named by its path; a broken reference is named by its Space and the Ids involved. Reading comes before the reference checks, so fixing the first round of problems can reveal a second.
+`pnpm cube check`, `pnpm cube run` and `pnpm cube import` print what they refuse and exit non-zero; `check` reads the directory exactly as `run` does, and writes nothing. A file that cannot be read is named by its path; a broken reference is named by its Space and the Ids involved. Reading comes before the reference checks, so fixing the first round of problems can reveal a second.
 
 ## Durable URLs and HTTP resources
 

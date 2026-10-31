@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { describeAggregateReadRefusal } from '@project/aggregate';
-import type { RunEvent, RunStart } from '../run/run';
+import type { RunEvent, RunRefusal } from '../run/run';
 import type { RunCommand } from './arguments';
 import { describeError } from './describe-error';
 import { RUN_HANDLING_SIGNALS, RUN_SIGNALS, decodeRunCommand } from './run-launcher';
@@ -21,10 +21,7 @@ import { shellWord } from './shell-word';
 const DEFAULT_PORT = 4173;
 
 /** Why a run did not start, as the sentence the author reads. */
-export const describeRunRefusal = (
-  refusal: Exclude<RunStart, { readonly kind: 'running' }>,
-  directory: string,
-): string => {
+export const describeRunRefusal = (refusal: RunRefusal, directory: string): string => {
   switch (refusal.kind) {
     case 'empty':
       return `${directory} holds no aggregate: it is missing or empty. To create one there: pnpm cube init ${shellWord(directory)}\n`;

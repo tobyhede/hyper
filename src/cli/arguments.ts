@@ -15,6 +15,11 @@ export interface InitCommand {
   readonly directory: string;
 }
 
+export interface CheckCommand {
+  readonly verb: 'check';
+  readonly directory: string;
+}
+
 export interface RunCommand {
   readonly verb: 'run';
   readonly directory: string;
@@ -24,7 +29,7 @@ export interface RunCommand {
 }
 
 export type InfinityCubeCommand =
-  { readonly verb: 'help' } | InitCommand | RunCommand | DatabaseCommand;
+  { readonly verb: 'help' } | InitCommand | RunCommand | CheckCommand | DatabaseCommand;
 
 interface VerbLine {
   readonly synopsis: string;
@@ -39,6 +44,10 @@ const VERB_LINES: readonly VerbLine[] = [
     summary: 'Serve an Aggregate directory, writing edits back to it',
   },
   {
+    synopsis: 'check <dir>',
+    summary: 'Read an Aggregate directory as run would, serving and writing nothing',
+  },
+  {
     synopsis: 'import <dir> [--store postgres|sqlite] [--dangerous-replace]',
     summary: 'Import an aggregate into a database (default postgres)',
   },
@@ -49,7 +58,7 @@ const VERB_LINES: readonly VerbLine[] = [
   { synopsis: 'help', summary: 'List every verb' },
 ];
 
-export const USAGE = 'Usage: cube <init|run|import|export|help> [arguments]\n';
+export const USAGE = 'Usage: cube <init|run|check|import|export|help> [arguments]\n';
 
 const synopsisWidth = Math.max(...VERB_LINES.map(({ synopsis }) => synopsis.length));
 
@@ -146,9 +155,10 @@ export const parseInfinityCubeArguments = (
     case 'help':
     case '--help':
       return rest.length === 0 ? { verb: 'help' } : undefined;
-    case 'init': {
+    case 'init':
+    case 'check': {
       const [directory, ...extra] = rest;
-      return isDirectory(directory) && extra.length === 0 ? { verb: 'init', directory } : undefined;
+      return isDirectory(directory) && extra.length === 0 ? { verb, directory } : undefined;
     }
     case 'run':
       return parseRunArguments(rest);

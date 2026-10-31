@@ -19,8 +19,8 @@ export interface InfinityCubeDependencies {
   readonly workingDirectory: string;
   /**
    * One target per store. Only the target `--store` names is opened, and only
-   * by a verb that reaches a database, so help, a usage error, `init` and
-   * `run` open none.
+   * by a verb that reaches a database, so help, a usage error, `init`,
+   * `run` and `check` open none.
    */
   readonly targets: Readonly<Record<InfinityCubeStore, DatabaseTarget>>;
   /** Serve an Aggregate directory until the author stops it, answering the exit code. */
@@ -48,6 +48,27 @@ const init = async (
   return 0;
 };
 
+const check = async (
+  directory: string,
+  { io, newId }: Pick<InfinityCubeDependencies, 'io' | 'newId'>,
+): Promise<number> => {
+  let result;
+  try {
+    const { checkAggregate } = await import('../run/run');
+    result = await checkAggregate(directory, newId);
+  } catch (error) {
+    io.stderr(`Could not check ${directory}: ${describeError(error)}\n`);
+    return 1;
+  }
+  if (result.kind !== 'valid') {
+    const { describeRunRefusal } = await import('./run-process');
+    io.stderr(describeRunRefusal(result, directory));
+    return 1;
+  }
+  io.stdout(`${directory} is a valid aggregate.\n`);
+  return 0;
+};
+
 /** Run one `cube` command line and answer its exit code. A usage error exits 2. */
 export const runInfinityCube = async (
   args: readonly string[],
@@ -66,6 +87,8 @@ export const runInfinityCube = async (
   switch (command.verb) {
     case 'init':
       return init(directory, { io, newId });
+    case 'check':
+      return check(directory, { io, newId });
     case 'run':
       return launchRun({ ...command, directory });
     case 'import':
